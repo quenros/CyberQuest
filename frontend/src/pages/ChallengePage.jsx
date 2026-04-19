@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useNavigate } from "react-router-dom";
 import Editor from "@monaco-editor/react";
 import api from "../api/client";
 
@@ -21,6 +22,7 @@ The developer built it in a hurry and didn't sanitize user input before displayi
 };
 
 export default function ChallengePage({ alias }) {
+  const navigate = useNavigate();
   const [payload, setPayload] = useState("");
   const [sandboxPort, setSandboxPort] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -75,7 +77,12 @@ export default function ChallengePage({ alias }) {
     <div className="flex min-h-screen flex-col bg-gray-950 text-gray-100">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-gray-800 px-6 py-3">
-        <span className="font-bold text-cyan-400">CyberQuest</span>
+        <div className="flex items-center gap-4">
+          <button onClick={() => navigate("/learn/xss")} className="text-sm text-gray-400 hover:text-white transition-colors">
+            ← Back to Lesson
+          </button>
+          <span className="font-bold text-cyan-400">CyberQuest</span>
+        </div>
         <span className="text-sm text-gray-400">Playing as <span className="text-white">{alias}</span></span>
       </div>
 
