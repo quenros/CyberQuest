@@ -123,25 +123,32 @@ React, Tailwind CSS, Framer Motion, Flask, MongoDB, Docker, Claude API (AI hints
 - Get basic auth and challenge system working
 - Deploy first Docker sandbox
 
+#### Access & Auth Strategy
+
+**Testing phase (now):** Name-only entry — user types a name/alias, stored in `localStorage`. No backend required. Share the URL and testers jump straight in. Lets us focus on challenge quality before building auth infrastructure.
+
+**Production (later):** Full auth with email/password, student/teacher roles, JWT, and class management. Built only after the challenge experience is validated.
+
 #### Backend Tasks (Flask)
-- [ ] User authentication (student/teacher roles) — Flask-JWT-Extended
 - [ ] MongoDB collections (users, challenges, progress, attempts)
 - [ ] Docker container management — docker-py
 - [ ] Challenge API endpoints (start, submit, validate)
 - [ ] Basic AI hint integration (Claude API)
+- [ ] Full user auth (student/teacher roles) — Flask-JWT-Extended *(deferred — post-testing)*
 
 #### Frontend Tasks (React)
-- [ ] Auth flow (login/signup)
+- [x] Name-only entry (alias stored in localStorage) — for controlled testing
 - [ ] Student dashboard (progress overview)
 - [ ] Challenge viewer component
-- [ ] Terminal/code editor interface
+- [ ] Monaco editor for payload input
+- [ ] Auth flow (login/signup) *(deferred — post-testing)*
 
 #### Infrastructure
 - [ ] Docker setup for challenge sandboxes
 - [ ] Deploy basic version (Vercel frontend + Railway/Render backend)
-- [ ] Database hosted (Supabase or Railway Postgres)
+- [ ] Database hosted (MongoDB Atlas free tier)
 
-**Milestone:** Can create account, start a challenge, get it running in Docker
+**Milestone:** Can enter a name, start an XSS challenge, submit a payload, get a hint
 
 ---
 
