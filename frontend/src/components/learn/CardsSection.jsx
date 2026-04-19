@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import Editor from "@monaco-editor/react";
 
 export default function CardsSection({ heading, items }) {
   const [hovered, setHovered] = useState(null);
@@ -63,10 +64,22 @@ export default function CardsSection({ heading, items }) {
                   example.html — {hovered.title}
                 </span>
               </div>
-              {/* Code — selectable plain text */}
-              <pre className="p-5 text-sm text-gray-300 font-mono leading-relaxed overflow-x-auto select-text">
-                <code>{hovered.code}</code>
-              </pre>
+              <Editor
+                height="180px"
+                defaultLanguage="html"
+                theme="vs-dark"
+                value={hovered.code}
+                options={{
+                  readOnly: true,
+                  fontSize: 13,
+                  minimap: { enabled: false },
+                  lineNumbers: "off",
+                  scrollBeyondLastLine: false,
+                  wordWrap: "on",
+                  renderLineHighlight: "none",
+                  domReadOnly: true,
+                }}
+              />
             </div>
           </motion.div>
         )}
