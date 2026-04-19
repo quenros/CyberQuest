@@ -132,6 +132,7 @@ export default function ChallengePage({ alias }) {
             if (data.xss_triggered && !cancelled) {
               clearInterval(intervalRef.current);
               setSolved(true);
+              setShowModal(true);
             }
           } catch { /* ignore poll errors */ }
         }, 2000);
@@ -146,8 +147,6 @@ export default function ChallengePage({ alias }) {
       clearInterval(intervalRef.current);
     };
   }, [topicId, challengeIndex]);
-
-  useEffect(() => { if (solved) setShowModal(true); }, [solved]);
 
   // Warn on browser refresh/close
   useEffect(() => {
