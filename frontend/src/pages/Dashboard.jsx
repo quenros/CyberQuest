@@ -73,8 +73,19 @@ export default function Dashboard({ alias }) {
                 </div>
 
                 {topic.unlocked && (
-                  <div className={`w-full text-center rounded-lg py-2 text-sm font-semibold text-gray-950 transition-colors ${c.btn}`}>
-                    Start Learning →
+                  <div className="flex gap-2">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); navigate(`/learn/${topic.id}`); }}
+                      className="flex-1 rounded-lg border border-gray-600 py-2 text-xs text-gray-400 hover:border-gray-400 hover:text-white transition-colors"
+                    >
+                      Learn First
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); navigate(`/challenges/${topic.id}/0`); }}
+                      className={`flex-1 rounded-lg py-2 text-xs font-semibold text-gray-950 transition-colors ${c.btn}`}
+                    >
+                      Start Hacking →
+                    </button>
                   </div>
                 )}
               </motion.div>

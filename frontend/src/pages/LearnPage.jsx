@@ -72,7 +72,7 @@ export default function LearnPage({ alias }) {
             <h2 className="text-2xl font-bold mb-2">{cta.heading}</h2>
             <p className="text-gray-400 mb-6">{cta.body}</p>
             <button
-              onClick={() => navigate(`/challenges/${topicId}`)}
+              onClick={() => navigate(`/challenges/${topicId}/0`)}
               className={`px-8 py-3 rounded-xl font-bold text-gray-950 transition-colors ${c.btn}`}
             >
               Start Challenges →

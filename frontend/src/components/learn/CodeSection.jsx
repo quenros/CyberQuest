@@ -13,9 +13,9 @@ export default function CodeSection({ heading, code }) {
       <h2 className="text-2xl font-bold mb-6">{heading}</h2>
       <div className="rounded-xl overflow-hidden border border-gray-700">
         <div className="flex items-center gap-2 bg-gray-800 px-4 py-2">
-          <span className="w-3 h-3 rounded-full bg-red-500/70" />
-          <span className="w-3 h-3 rounded-full bg-yellow-500/70" />
-          <span className="w-3 h-3 rounded-full bg-green-500/70" />
+          <span className="w-3 h-4 rounded-full bg-red-500/70" />
+          <span className="w-3 h-4 rounded-full bg-yellow-500/70" />
+          <span className="w-3 h-4 rounded-full bg-green-500/70" />
           <span className="ml-2 text-xs text-gray-500">example.html</span>
         </div>
         <Editor
