@@ -95,11 +95,17 @@ export default function ChallengePage({ alias }) {
   const [leftW, setLeftW]   = useState(300);
   const [centerW, setCenterW] = useState(380);
 
-  const iframeRef = useRef(null);
-  const pollRef   = useRef(null);
+  const iframeRef    = useRef(null);
+  const intervalRef  = useRef(null);
+  const challengeRef = useRef(challenge);
 
-  // Clear and restart whenever the challenge changes
+  // Keep challengeRef current so stopSandbox always uses the right id
+  useEffect(() => { challengeRef.current = challenge; }, [challenge]);
+
+  // Reset state and restart sandbox whenever challenge changes
   useEffect(() => {
+    let cancelled = false;
+
     setPayload("");
     setSolved(false);
     setShowModal(false);
@@ -107,10 +113,37 @@ export default function ChallengePage({ alias }) {
     setSubmitting(false);
     setSandboxPort(null);
     setLoading(true);
-    startSandbox();
+    clearInterval(intervalRef.current);
+
+    const challengeId = challenge.id;
+
+    async function start() {
+      try {
+        const { data } = await api.post("/sandbox/start", { alias, challenge_id: challengeId });
+        if (cancelled) return;
+        setSandboxPort(data.port);
+
+        intervalRef.current = setInterval(async () => {
+          if (cancelled) return;
+          try {
+            const { data } = await api.get("/sandbox/status", {
+              params: { alias, challenge_id: challengeId },
+            });
+            if (data.xss_triggered && !cancelled) {
+              clearInterval(intervalRef.current);
+              setSolved(true);
+            }
+          } catch { /* ignore poll errors */ }
+        }, 2000);
+      } catch { /* ignore start errors */ }
+      finally { if (!cancelled) setLoading(false); }
+    }
+
+    start();
 
     return () => {
-      clearInterval(pollRef.current);
+      cancelled = true;
+      clearInterval(intervalRef.current);
     };
   }, [topicId, challengeIndex]);
 
@@ -123,30 +156,10 @@ export default function ChallengePage({ alias }) {
     return () => window.removeEventListener("beforeunload", handler);
   }, []);
 
-  async function startSandbox() {
-    try {
-      const { data } = await api.post("/sandbox/start", { alias, challenge_id: challenge.id });
-      setSandboxPort(data.port);
-      pollRef.current = setInterval(pollStatus, 2000);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function pollStatus() {
-    const { data } = await api.get("/sandbox/status", {
-      params: { alias, challenge_id: challenge.id },
-    });
-    if (data.xss_triggered) {
-      clearInterval(pollRef.current);
-      setSolved(true);
-    }
-  }
-
   async function stopSandbox() {
-    clearInterval(pollRef.current);
+    clearInterval(intervalRef.current);
     try {
-      await api.post("/sandbox/stop", { alias, challenge_id: challenge.id });
+      await api.post("/sandbox/stop", { alias, challenge_id: challengeRef.current.id });
     } catch { /* best-effort */ }
   }
 
