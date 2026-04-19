@@ -26,7 +26,7 @@ A full-stack web application designed to make cybersecurity education accessible
 - Teacher dashboard for tracking progress and understanding common pain points
 
 #### Built With
-React, Node.js, Docker, PostgreSQL, Claude API (AI hints), WebSockets (real-time feedback)
+React, Tailwind CSS, Framer Motion, Flask, MongoDB, Docker, Claude API (AI hints)
 
 #### Current Status
 - [ ] MVP in development
@@ -41,81 +41,75 @@ React, Node.js, Docker, PostgreSQL, Claude API (AI hints), WebSockets (real-time
 
 #### Frontend
 - **React 18** - Functional components, hooks
-- **Tailwind CSS** - Rapid styling
-- **Monaco Editor** - Code editor component
-- **xterm.js** - Terminal emulator for CLI challenges
+- **Tailwind CSS** - Styling (full visual control for cyber aesthetic)
+- **Framer Motion** - Animations (challenge unlocks, XP gains, success effects)
+- **Monaco Editor** - Code editor for typing/editing payloads in challenges
 - **React Query** - Data fetching
 - **Zustand or Context** - State management
 
+> **xterm.js** (terminal emulator) — hold off until network/forensics modules. XSS and SQLi challenges don't need a full terminal; add when CLI-based challenges arrive.
+
 #### Backend
-- **Node.js + Express** - REST API
-- **PostgreSQL** - User data, progress, challenges
-- **Docker SDK** - Container management
-- **Bull + Redis** - Job queue for running user code
+- **Flask (Python)** - REST API
+- **MongoDB** - User data, progress, challenges (NoSQL, schema documented separately)
+- **docker-py** - Docker container management
+- **Flask-JWT-Extended** - Authentication
 - **Claude API** - AI hints and feedback
-- **JWT** - Authentication
+
+> **Celery + Redis** (background job queue) — not needed for MVP (20-50 users). Add when scaling to hundreds of concurrent Docker spin-ups becomes necessary.
 
 #### Infrastructure
 - **Frontend:** Vercel (free, fast deploys)
 - **Backend:** Railway or Render (free tier works for MVP)
-- **Database:** Supabase or Railway Postgres
-- **Docker:** Run on same server as backend (Railway supports)
-- **Redis:** Upstash (free tier)
+- **Database:** MongoDB Atlas (free tier)
+- **Docker:** Run on same server as backend
 
 #### Why This Stack
-- All modern, commonly used in 2026
+- Python/Flask familiar and fast to build with
+- Tailwind + Framer Motion gives full control over the visual/gamification feel
+- MongoDB removes schema migration friction during rapid MVP iteration
 - Free tiers cover MVP needs
-- Shows full-stack architecture understanding
 - AI integration demonstrates current tech awareness
 - Docker shows infrastructure understanding
 
 ---
 
-## Database Schema
+## Database Schema (MongoDB Collections)
 
-```sql
--- Users
-CREATE TABLE users (
-  id UUID PRIMARY KEY,
-  email VARCHAR UNIQUE,
-  role ENUM('student', 'teacher'),
-  created_at TIMESTAMP
-);
+> Full collection schemas documented separately. High-level structure below.
 
--- Challenges
-CREATE TABLE challenges (
-  id UUID PRIMARY KEY,
-  module_id UUID,
-  title VARCHAR,
-  difficulty INT, -- 1-5
-  description TEXT,
-  docker_image VARCHAR,
-  success_condition JSONB,
-  hints JSONB[], -- array of hint objects
-  points INT
-);
+```js
+// users
+{
+  _id, email, password_hash,
+  role: "student" | "teacher",
+  created_at
+}
 
--- Student Progress
-CREATE TABLE progress (
-  user_id UUID,
-  challenge_id UUID,
-  status ENUM('locked', 'in_progress', 'completed'),
-  attempts INT,
-  completed_at TIMESTAMP,
-  time_spent_seconds INT,
-  PRIMARY KEY (user_id, challenge_id)
-);
+// challenges
+{
+  _id, module_id, title,
+  difficulty,        // 1-5
+  description,
+  docker_image,
+  success_condition, // object
+  hints,             // array of hint objects
+  points
+}
 
--- Attempt History (for AI context)
-CREATE TABLE attempts (
-  id UUID PRIMARY KEY,
-  user_id UUID,
-  challenge_id UUID,
-  input TEXT, -- what they tried
-  success BOOLEAN,
-  hint_used BOOLEAN,
-  created_at TIMESTAMP
-);
+// progress
+{
+  user_id, challenge_id,
+  status: "locked" | "in_progress" | "completed",
+  attempts, completed_at, time_spent_seconds
+}
+
+// attempts  (for AI context)
+{
+  _id, user_id, challenge_id,
+  input,        // what they tried
+  success, hint_used, created_at
+}
 ```
 
 ---
@@ -129,10 +123,10 @@ CREATE TABLE attempts (
 - Get basic auth and challenge system working
 - Deploy first Docker sandbox
 
-#### Backend Tasks (Node.js/Express)
-- [ ] User authentication (student/teacher roles)
-- [ ] Database schema (users, challenges, progress, attempts)
-- [ ] Docker container management system
+#### Backend Tasks (Flask)
+- [ ] User authentication (student/teacher roles) — Flask-JWT-Extended
+- [ ] MongoDB collections (users, challenges, progress, attempts)
+- [ ] Docker container management — docker-py
 - [ ] Challenge API endpoints (start, submit, validate)
 - [ ] Basic AI hint integration (Claude API)
 
@@ -437,7 +431,7 @@ CREATE TABLE attempts (
 
 #### Monday: Architecture Setup
 ```
-You: "Claude, help me set up a Node.js + Express + Postgres project 
+You: "Claude, help me set up a Flask + MongoDB project 
       with user auth using JWT"
 Claude: [Generates boilerplate, explains structure]
 You: Review, customize, deploy
@@ -448,14 +442,14 @@ Time: 2-3 hours instead of 6-8
 ```
 You: "I need to spin up Docker containers for each challenge, 
       isolate them, and auto-cleanup after 30 min"
-Claude: [Provides Docker SDK code, cleanup logic]
+Claude: [Provides docker-py code, cleanup logic]
 You: Test, refine, integrate
 Time: 3-4 hours instead of 8-10
 ```
 
 #### Weekend: First Challenge
 ```
-You: "Create a vulnerable Node.js app with XSS in comments"
+You: "Create a vulnerable Python app with XSS in comments"
 Claude: [Generates vulnerable app code]
 You: Containerize, test, write challenge description
 Time: 4-5 hours instead of full day
