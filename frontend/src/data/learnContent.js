@@ -63,7 +63,7 @@ export const LEARN_CONTENT = {
 </script>`,
           },
           {
-            icon: "🖥️", title: "Page Defacement", side: "left",
+            icon: "🖥️", title: "Page Defacement", side: "left", codeHeight: "260px",
             body: "Modify what the victim sees on the page.",
             code: `// Injected into a vulnerable page
 <script>

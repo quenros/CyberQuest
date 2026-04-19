@@ -65,7 +65,7 @@ export default function CardsSection({ heading, items }) {
                 </span>
               </div>
               <Editor
-                height="180px"
+                height={hovered.codeHeight ?? "180px"}
                 defaultLanguage="html"
                 theme="vs-dark"
                 value={hovered.code}
