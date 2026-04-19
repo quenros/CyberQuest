@@ -43,7 +43,7 @@ TEMPLATE = """
     {% if comment %}
     <div class="comment-box">
       <div class="author">anonymous · just now</div>
-      <div>{{ comment }}</div>
+      <div>{{ comment | safe }}</div>
     </div>
     {% endif %}
     <div class="comment-box">
