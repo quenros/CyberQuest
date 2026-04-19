@@ -187,7 +187,7 @@ export default function ChallengePage({ alias }) {
   }
 
   function goNextChallenge() {
-    const dest = `/challenges/${topicId}/${challengeIndex + 1}`;
+    const dest = hasNext ? `/challenges/${topicId}/${challengeIndex + 1}` : "/";
     if (solved) {
       stopSandbox().then(() => navigate(dest));
     } else {
