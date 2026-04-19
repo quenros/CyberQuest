@@ -1,12 +1,10 @@
 import docker
-import os
+import time
 
 client = docker.from_env()
 
-CHALLENGE_TIMEOUT = 30 * 60  # 30 minutes
 
-
-def start_challenge_container(docker_image: str, challenge_id: str, user_id: str) -> dict:
+def start_challenge_container(docker_image: str, challenge_id: str, user_alias: str) -> dict:
     container = client.containers.run(
         docker_image,
         detach=True,
@@ -14,10 +12,16 @@ def start_challenge_container(docker_image: str, challenge_id: str, user_id: str
         mem_limit="128m",
         cpu_period=100000,
         cpu_quota=50000,
-        network_mode="bridge",
-        labels={"cyberquest": "1", "challenge_id": challenge_id, "user_id": user_id},
+        ports={"3000/tcp": None},  # bind to a random host port
+        labels={"cyberquest": "1", "challenge_id": challenge_id, "user_alias": user_alias},
     )
-    return {"container_id": container.id, "status": "running"}
+
+    # Wait briefly for the port binding to be assigned
+    time.sleep(1)
+    container.reload()
+    port = int(container.ports["3000/tcp"][0]["HostPort"])
+
+    return {"container_id": container.id, "port": port, "status": "running"}
 
 
 def stop_container(container_id: str):

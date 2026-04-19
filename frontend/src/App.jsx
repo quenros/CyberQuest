@@ -1,16 +1,20 @@
+import { useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import useAuthStore from "./store/authStore";
-import Login from "./pages/Login";
-import Dashboard from "./pages/Dashboard";
+import NameEntry from "./pages/NameEntry";
+import ChallengePage from "./pages/ChallengePage";
 
 const queryClient = new QueryClient();
 
 export default function App() {
-  const token = useAuthStore((s) => s.token);
+  const [alias, setAlias] = useState(() => localStorage.getItem("alias") || "");
 
   return (
     <QueryClientProvider client={queryClient}>
-      {token ? <Dashboard /> : <Login />}
+      {alias ? (
+        <ChallengePage alias={alias} />
+      ) : (
+        <NameEntry onEnter={setAlias} />
+      )}
     </QueryClientProvider>
   );
 }
