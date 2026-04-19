@@ -2,6 +2,14 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Editor from "@monaco-editor/react";
 
+const LINE_HEIGHT = 19; // px per line at font-size 13
+const PADDING = 24;    // top + bottom padding inside editor
+
+function codeHeight(code) {
+  const lines = code.trimEnd().split("\n").length;
+  return `${lines * LINE_HEIGHT + PADDING}px`;
+}
+
 export default function CardsSection({ heading, items }) {
   const [hovered, setHovered] = useState(null);
 
@@ -65,7 +73,7 @@ export default function CardsSection({ heading, items }) {
                 </span>
               </div>
               <Editor
-                height={hovered.codeHeight ?? "180px"}
+                height={codeHeight(hovered.code)}
                 defaultLanguage="html"
                 theme="vs-dark"
                 value={hovered.code}

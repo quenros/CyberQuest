@@ -35,8 +35,7 @@ export const LEARN_CONTENT = {
         heading: "Why is it dangerous?",
         items: [
           {
-            icon: "🍪", title: "Cookie Theft", side: "left",
-            body: "Steal session cookies to log in as the victim.",
+            icon: "🍪", title: "Cookie Theft", side: "left",            body: "Steal session cookies to log in as the victim.",
             code: `// Injected into a vulnerable page
 <script>
   // Grab the victim's session cookie
@@ -47,8 +46,7 @@ export const LEARN_CONTENT = {
 </script>`,
           },
           {
-            icon: "🎣", title: "Phishing", side: "right",
-            body: "Inject fake login forms to capture credentials.",
+            icon: "🎣", title: "Phishing", side: "right",            body: "Inject fake login forms to capture credentials.",
             code: `// Injected into a vulnerable page
 <script>
   // Replace the page with a fake login form
@@ -63,8 +61,7 @@ export const LEARN_CONTENT = {
 </script>`,
           },
           {
-            icon: "🖥️", title: "Page Defacement", side: "left", codeHeight: "260px",
-            body: "Modify what the victim sees on the page.",
+            icon: "🖥️", title: "Page Defacement", side: "left",            body: "Modify what the victim sees on the page.",
             code: `// Injected into a vulnerable page
 <script>
   // Wipe the entire page content
@@ -78,8 +75,7 @@ export const LEARN_CONTENT = {
 </script>`,
           },
           {
-            icon: "⌨️", title: "Keylogging", side: "right",
-            body: "Record every keystroke the victim types.",
+            icon: "⌨️", title: "Keylogging", side: "right",            body: "Record every keystroke the victim types.",
             code: `// Injected into a vulnerable page
 <script>
   let log = "";
