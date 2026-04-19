@@ -4,6 +4,10 @@ import { motion, AnimatePresence } from "framer-motion";
 export default function CardsSection({ heading, items }) {
   const [hovered, setHovered] = useState(null);
 
+  function handleClick(card) {
+    setHovered((prev) => (prev?.title === card.title ? null : card));
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 24 }}
@@ -19,11 +23,10 @@ export default function CardsSection({ heading, items }) {
         {items.map((card, i) => (
           <motion.div
             key={i}
-            onMouseEnter={() => setHovered(card)}
-            onMouseLeave={() => setHovered(null)}
+            onClick={() => handleClick(card)}
             whileHover={{ scale: 1.02 }}
             transition={{ duration: 0.15 }}
-            className={`flex flex-col gap-2 rounded-xl border p-4 cursor-default transition-colors duration-150 ${
+            className={`flex flex-col gap-2 rounded-xl border p-4 cursor-pointer transition-colors duration-150 ${
               hovered?.title === card.title
                 ? "border-cyan-500/50 bg-cyan-500/5"
                 : "border-gray-700 bg-gray-800"
@@ -32,7 +35,9 @@ export default function CardsSection({ heading, items }) {
             <span className="text-2xl">{card.icon}</span>
             <div className="font-semibold text-sm">{card.title}</div>
             <div className="text-xs text-gray-400 leading-relaxed">{card.body}</div>
-            <div className="text-xs text-gray-600 mt-1">hover to see example</div>
+            <div className="text-xs text-gray-600 mt-1">
+              {hovered?.title === card.title ? "click to close" : "click to see example"}
+            </div>
           </motion.div>
         ))}
       </div>
