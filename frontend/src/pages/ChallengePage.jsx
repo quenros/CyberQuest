@@ -54,8 +54,11 @@ export default function ChallengePage({ alias }) {
   const [sandboxPort, setSandboxPort] = useState(null);
   const [loading, setLoading]       = useState(true);
   const [solved, setSolved]         = useState(false);
+  const [showModal, setShowModal]   = useState(false);
   const [hintIndex, setHintIndex]   = useState(-1);
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => { if (solved) setShowModal(true); }, [solved]);
 
   // Panel widths in px
   const [leftW,   setLeftW]   = useState(300);
@@ -143,6 +146,18 @@ export default function ChallengePage({ alias }) {
           {/* Hints */}
           <div className="mt-auto flex flex-col gap-2">
             <AnimatePresence>
+              {solved && (
+                <motion.button
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  onClick={() => navigate("/")}
+                  className="w-full rounded-lg bg-cyan-500 py-2 text-sm font-semibold text-gray-950 hover:bg-cyan-400 transition-colors"
+                >
+                  Next Challenge →
+                </motion.button>
+              )}
+            </AnimatePresence>
+            <AnimatePresence>
               {CHALLENGE.hints.slice(0, hintIndex + 1).map((hint, i) => (
                 <motion.div
                   key={i}
@@ -229,10 +244,11 @@ export default function ChallengePage({ alias }) {
 
       {/* Success overlay */}
       <AnimatePresence>
-        {solved && (
+        {showModal && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
             className="fixed inset-0 flex items-center justify-center bg-black/70 z-50"
           >
             <motion.div
@@ -251,7 +267,7 @@ export default function ChallengePage({ alias }) {
               </div>
               <div className="flex gap-3">
                 <button
-                  onClick={() => setSolved(false)}
+                  onClick={() => setShowModal(false)}
                   className="flex-1 rounded-lg border border-gray-700 py-2 text-sm text-gray-400 hover:border-gray-500 hover:text-white transition-colors"
                 >
                   Review Challenge
