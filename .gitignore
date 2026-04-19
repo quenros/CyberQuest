@@ -6,3 +6,10 @@ dist/
 build/
 *.log
 .DS_Store
+
+# Python
+backend/venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
