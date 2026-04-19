@@ -1,5 +1,5 @@
 from flask import Blueprint, jsonify, request
-from app.services.docker_service import start_challenge_container, stop_container, get_container_port
+from app.services.docker_service import start_challenge_container, stop_container
 import requests as http
 
 sandbox_bp = Blueprint("sandbox", __name__)
