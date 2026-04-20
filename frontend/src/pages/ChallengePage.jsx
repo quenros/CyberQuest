@@ -190,10 +190,9 @@ export default function ChallengePage({ alias }) {
     }
   }
 
-  async function confirmLeave() {
+  function confirmLeave() {
     setShowExitWarning(false);
-    await stopSandbox();
-    navigate(pendingNav);
+    doNavigate(pendingNav);
   }
 
   function goNextChallenge() {
