@@ -35,7 +35,7 @@ TEMPLATE = """
   <p style="color:#94a3b8">Share your thoughts with the community!</p>
 
   <form method="GET" action="/">
-    <input type="text" name="comment" placeholder="Leave a comment..." value="{{ comment_raw }}">
+    <input type="text" name="comment" placeholder="Leave a comment..." value="{{ comment_raw | e }}">
     <button type="submit">Post</button>
   </form>
 
