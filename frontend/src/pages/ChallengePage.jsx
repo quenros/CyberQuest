@@ -159,13 +159,6 @@ export default function ChallengePage({ alias }) {
     return () => window.removeEventListener("beforeunload", handler);
   }, []);
 
-  async function stopSandbox() {
-    clearInterval(intervalRef.current);
-    try {
-      await api.post("/sandbox/stop", { alias, challenge_id: challengeRef.current.id });
-    } catch { /* best-effort */ }
-  }
-
   function submitPayload() {
     if (!sandboxPort || !payload.trim()) return;
     setSubmitting(true);
@@ -177,8 +170,8 @@ export default function ChallengePage({ alias }) {
   function doNavigate(destination) {
     if (isNavigatingRef.current) return;
     isNavigatingRef.current = true;
+    clearInterval(intervalRef.current);
     navigate(destination);
-    stopSandbox();
   }
 
   function requestNav(destination) {
