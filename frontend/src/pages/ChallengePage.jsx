@@ -95,12 +95,16 @@ export default function ChallengePage({ alias }) {
   const [leftW, setLeftW]   = useState(300);
   const [centerW, setCenterW] = useState(380);
 
-  const iframeRef    = useRef(null);
-  const intervalRef  = useRef(null);
-  const challengeRef = useRef(challenge);
+  const iframeRef       = useRef(null);
+  const intervalRef     = useRef(null);
+  const challengeRef    = useRef(challenge);
+  const isNavigatingRef = useRef(false);
 
-  // Keep challengeRef current so stopSandbox always uses the right id
-  useEffect(() => { challengeRef.current = challenge; }, [challenge]);
+  // Keep challengeRef current; reset guard on challenge change
+  useEffect(() => {
+    challengeRef.current = challenge;
+    isNavigatingRef.current = false;
+  }, [challenge]);
 
   // Reset state and restart sandbox whenever challenge changes
   useEffect(() => {
@@ -170,10 +174,16 @@ export default function ChallengePage({ alias }) {
     setTimeout(() => setSubmitting(false), 800);
   }
 
+  function doNavigate(destination) {
+    if (isNavigatingRef.current) return;
+    isNavigatingRef.current = true;
+    navigate(destination);
+    stopSandbox();
+  }
+
   function requestNav(destination) {
     if (solved) {
-      navigate(destination);
-      stopSandbox();
+      doNavigate(destination);
     } else {
       setPendingNav(destination);
       setShowExitWarning(true);
@@ -188,8 +198,7 @@ export default function ChallengePage({ alias }) {
 
   function goNextChallenge() {
     const dest = hasNext ? `/challenges/${topicId}/${challengeIndex + 1}` : "/";
-    navigate(dest);
-    stopSandbox();
+    doNavigate(dest);
   }
 
   if (!challenge) {
