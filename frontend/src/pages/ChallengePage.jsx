@@ -95,12 +95,16 @@ export default function ChallengePage({ alias }) {
   const [leftW, setLeftW]   = useState(300);
   const [centerW, setCenterW] = useState(380);
 
-  const iframeRef    = useRef(null);
-  const intervalRef  = useRef(null);
-  const challengeRef = useRef(challenge);
+  const iframeRef      = useRef(null);
+  const intervalRef    = useRef(null);
+  const challengeRef   = useRef(challenge);
+  const isNavigatingRef = useRef(false);
 
   // Keep challengeRef current so stopSandbox always uses the right id
-  useEffect(() => { challengeRef.current = challenge; }, [challenge]);
+  useEffect(() => {
+    challengeRef.current = challenge;
+    isNavigatingRef.current = false;  // reset guard on challenge change
+  }, [challenge]);
 
   // Reset state and restart sandbox whenever challenge changes
   useEffect(() => {
@@ -162,6 +166,13 @@ export default function ChallengePage({ alias }) {
     } catch { /* best-effort */ }
   }
 
+  async function doNavigate(dest) {
+    if (isNavigatingRef.current) return;
+    isNavigatingRef.current = true;
+    await stopSandbox();
+    navigate(dest);
+  }
+
   function submitPayload() {
     if (!sandboxPort || !payload.trim()) return;
     setSubmitting(true);
@@ -172,8 +183,7 @@ export default function ChallengePage({ alias }) {
 
   function requestNav(destination) {
     if (solved) {
-      // Already solved — no need to warn, just stop silently and go
-      stopSandbox().then(() => navigate(destination));
+      doNavigate(destination);
     } else {
       setPendingNav(destination);
       setShowExitWarning(true);
@@ -181,18 +191,13 @@ export default function ChallengePage({ alias }) {
   }
 
   async function confirmLeave() {
-    await stopSandbox();
     setShowExitWarning(false);
-    navigate(pendingNav);
+    await doNavigate(pendingNav);
   }
 
   function goNextChallenge() {
     const dest = hasNext ? `/challenges/${topicId}/${challengeIndex + 1}` : "/";
-    if (solved) {
-      stopSandbox().then(() => navigate(dest));
-    } else {
-      requestNav(dest);
-    }
+    doNavigate(dest);
   }
 
   if (!challenge) {

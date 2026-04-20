@@ -23,9 +23,11 @@ def start():
         return jsonify({"error": "Unknown challenge"}), 404
 
     session_key = f"{alias}:{challenge_id}"
-    if session_key in _sessions:
-        existing = _sessions[session_key]
-        return jsonify({"port": existing["port"], "already_running": True}), 200
+
+    # Always clean up any existing session so re-entry gets a fresh container
+    old = _sessions.pop(session_key, None)
+    if old:
+        stop_container(old["container_id"])
 
     result = start_challenge_container(image, challenge_id, alias)
     _sessions[session_key] = {**result, "challenge_id": challenge_id}
