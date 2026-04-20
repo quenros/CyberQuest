@@ -211,10 +211,10 @@ export default function ChallengePage({ alias }) {
       <div className="flex items-center justify-between border-b border-gray-800 px-6 py-3 flex-shrink-0">
         <div className="flex items-center gap-4">
           <button
-            onClick={() => requestNav(`/learn/${topicId}`)}
+            onClick={() => requestNav(-1)}
             className="text-sm text-gray-400 hover:text-white transition-colors"
           >
-            ← Back to Lesson
+            ← Back
           </button>
           <span className="font-bold text-cyan-400">CyberQuest</span>
         </div>

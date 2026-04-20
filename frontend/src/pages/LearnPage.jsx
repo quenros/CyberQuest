@@ -33,10 +33,10 @@ export default function LearnPage({ alias }) {
       {/* Header */}
       <header className="border-b border-gray-800 px-8 py-4 flex items-center justify-between sticky top-0 bg-gray-950/90 backdrop-blur z-10">
         <button
-          onClick={() => navigate("/")}
+          onClick={() => navigate(-1)}
           className="text-sm text-gray-400 hover:text-white transition-colors"
         >
-          ← Dashboard
+          ← Back
         </button>
         <span className="text-sm text-gray-400">
           Hacking as <span className="text-white font-medium">{alias}</span>
