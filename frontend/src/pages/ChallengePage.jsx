@@ -95,16 +95,12 @@ export default function ChallengePage({ alias }) {
   const [leftW, setLeftW]   = useState(300);
   const [centerW, setCenterW] = useState(380);
 
-  const iframeRef      = useRef(null);
-  const intervalRef    = useRef(null);
-  const challengeRef   = useRef(challenge);
-  const isNavigatingRef = useRef(false);
+  const iframeRef    = useRef(null);
+  const intervalRef  = useRef(null);
+  const challengeRef = useRef(challenge);
 
   // Keep challengeRef current so stopSandbox always uses the right id
-  useEffect(() => {
-    challengeRef.current = challenge;
-    isNavigatingRef.current = false;  // reset guard on challenge change
-  }, [challenge]);
+  useEffect(() => { challengeRef.current = challenge; }, [challenge]);
 
   // Reset state and restart sandbox whenever challenge changes
   useEffect(() => {
@@ -166,13 +162,6 @@ export default function ChallengePage({ alias }) {
     } catch { /* best-effort */ }
   }
 
-  async function doNavigate(dest) {
-    if (isNavigatingRef.current) return;
-    isNavigatingRef.current = true;
-    await stopSandbox();
-    navigate(dest);
-  }
-
   function submitPayload() {
     if (!sandboxPort || !payload.trim()) return;
     setSubmitting(true);
@@ -183,7 +172,7 @@ export default function ChallengePage({ alias }) {
 
   function requestNav(destination) {
     if (solved) {
-      doNavigate(destination);
+      stopSandbox().then(() => navigate(destination));
     } else {
       setPendingNav(destination);
       setShowExitWarning(true);
@@ -192,12 +181,13 @@ export default function ChallengePage({ alias }) {
 
   async function confirmLeave() {
     setShowExitWarning(false);
-    await doNavigate(pendingNav);
+    await stopSandbox();
+    navigate(pendingNav);
   }
 
   function goNextChallenge() {
     const dest = hasNext ? `/challenges/${topicId}/${challengeIndex + 1}` : "/";
-    doNavigate(dest);
+    stopSandbox().then(() => navigate(dest));
   }
 
   if (!challenge) {
