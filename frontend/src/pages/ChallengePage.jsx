@@ -172,7 +172,8 @@ export default function ChallengePage({ alias }) {
 
   function requestNav(destination) {
     if (solved) {
-      stopSandbox().then(() => navigate(destination));
+      navigate(destination);
+      stopSandbox();
     } else {
       setPendingNav(destination);
       setShowExitWarning(true);
@@ -187,7 +188,8 @@ export default function ChallengePage({ alias }) {
 
   function goNextChallenge() {
     const dest = hasNext ? `/challenges/${topicId}/${challengeIndex + 1}` : "/";
-    stopSandbox().then(() => navigate(dest));
+    navigate(dest);
+    stopSandbox();
   }
 
   if (!challenge) {
