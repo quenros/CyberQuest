@@ -28,6 +28,10 @@ export const CHALLENGES = {
       targetName: "ByteBoard",
       editorLanguage: "html",
       sandboxType: "srcdoc", // stateless — no Docker container needed
+      editorLabel: "Payload",
+      editorAction: "Inject into Page",
+      editorHint: "Type an HTML payload here. It gets pasted directly into the page's comment field without any sanitization — just as a real attacker would exploit it.",
+      editorPlaceholder: "<tag>...</tag>",
       summary: "Inject a script into an unsanitized comment field.",
       description:
         "ByteBoard is a community comment board. Users can post comments and see them rendered on the page.\n\nThe developer built it in a hurry and didn't sanitize user input before displaying it. Can you inject a script that calls alert()?",
@@ -152,6 +156,10 @@ export const CHALLENGES = {
       targetName: "DevDocs",
       editorLanguage: "html",
       sandboxType: "srcdoc", // stateless — no Docker container needed
+      editorLabel: "Search Query",
+      editorAction: "Inject into Page",
+      editorHint: "Your input is embedded inside a JavaScript string in the page source. Try a payload that breaks out of the string context and executes its own code.",
+      editorPlaceholder: `"; your code here//`,
       summary: "Break out of a JavaScript string context to execute code.",
       description:
         "DevDocs is a documentation search site. The developer properly escaped the search results display — but they left a hidden analytics script that embeds your search query directly into JavaScript source code.\n\nTo find it:\n1. Type anything into the search box and press Search.\n2. Right-click inside the DevDocs panel and choose **View Frame Source** (Chrome) or **This Frame → View Frame Source** (Firefox).\n3. Scroll to the very bottom — you'll see a <script> block with a variable that contains your search query.\n4. Now figure out how to break out of that variable and run your own code.\n\nHTML tags won't work here. The vulnerability is at the JavaScript level.",
@@ -317,6 +325,10 @@ export const CHALLENGES = {
       targetName: "ReturnPortal",
       editorLanguage: "plaintext",
       sandboxType: "srcdoc", // stateless — no Docker container needed
+      editorLabel: "Return URL",
+      editorAction: "Set Return URL",
+      editorHint: "Your input becomes the href of the 'Return to previous page' link. The page expects an http:// URL — try a URI scheme that tells the browser to run code instead of navigating.",
+      editorPlaceholder: "scheme:...",
       summary: "Inject a javascript: URI into a link's href to execute code.",
       description:
         "ReturnPortal is a login service used by internal company tools. When your session expires on a company app, you get redirected through ReturnPortal to log back in — and it sends you right back using a return URL.\n\nStart on CorpDash on the right. Your session has expired — click Login to go through ReturnPortal. Notice the 'Returning to:' field and how it reflects your payload.\n\nTo find the vulnerability:\n· After logging in, right-click the panel → View Frame Source. Find the comment near the return link.\n· Think about what kinds of values a browser accepts as a valid href.",
@@ -341,6 +353,27 @@ export const CHALLENGES = {
           {
             title: "Validate the URL scheme before using it",
             body: "Check that the URL starts with http:// or https:// before embedding it in an href. Reject anything else — javascript:, data:, and vbscript: are all dangerous schemes.",
+            code: `// Vulnerable — runs any URI scheme including javascript:
+return-link.addEventListener('click', function(e) {
+  e.preventDefault();
+  var href = this.getAttribute('href') || '';
+  if (href.toLowerCase().indexOf('javascript:') === 0) {
+    var code = href.slice(href.indexOf(':') + 1);
+    try { (new Function(code))(); } catch(err) {}
+  } else {
+    showDashboard();
+  }
+});
+
+// Secure — only allows http:// and https://
+return-link.addEventListener('click', function(e) {
+  e.preventDefault();
+  var href = this.getAttribute('href') || '';
+  if (/^https?:\\/\\//i.test(href)) {
+    showDashboard();
+  }
+  // Any other scheme (javascript:, data:, etc.) is silently rejected
+});`,
           },
           {
             title: "Use encodeURIComponent() for URL parameters",
@@ -360,7 +393,7 @@ export const CHALLENGES = {
     * { box-sizing: border-box; }
     body { font-family: monospace; background: #0f172a; color: #e2e8f0; margin: 0; }
     /* --- ReturnPortal (login success) --- */
-    #page-login { display: none; align-items: center; justify-content: center; min-height: 100vh; padding: 24px; }
+    #page-login { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 24px; }
     .card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 36px 32px; max-width: 400px; width: 100%; text-align: center; }
     .logo { font-size: 32px; margin-bottom: 6px; }
     .app-name { font-size: 18px; font-weight: bold; color: #38bdf8; margin-bottom: 20px; }
@@ -371,7 +404,7 @@ export const CHALLENGES = {
     .return-btn { color: #38bdf8; text-decoration: none; font-size: 14px; font-weight: bold; padding: 10px 24px; border: 1px solid #38bdf8; border-radius: 6px; display: inline-block; }
     .return-btn:hover { background: #0ea5e9; color: #0f172a; }
     /* --- CorpDash (destination page) --- */
-    #page-dashboard { display: block; min-height: 100vh; }
+    #page-dashboard { display: none; min-height: 100vh; }
     .dash-header { background: #1e293b; border-bottom: 1px solid #334155; padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; }
     .dash-logo { color: #a78bfa; font-weight: bold; font-size: 15px; }
     .dash-user { color: #64748b; font-size: 12px; }
@@ -406,13 +439,7 @@ export const CHALLENGES = {
       document.getElementById('page-dashboard').style.display = 'none';
       document.getElementById('page-login').style.cssText = 'display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px';
     }
-    // If a payload was already submitted, skip the dashboard and go straight to ReturnPortal
-    window.addEventListener('DOMContentLoaded', function() {
-      if (document.getElementById('return-link').getAttribute('href')) {
-        showLogin();
-      }
-    });
-  </script>
+</script>
 </head>
 <body>
   <!-- ReturnPortal: login success page -->
@@ -452,8 +479,8 @@ export const CHALLENGES = {
         <div class="dash-item"><span>Deploy to staging — passed</span> 18 min ago</div>
         <div class="dash-item"><span>alice left a comment on PR #88</span> 1 hr ago</div>
       </div>
-      <div style="background:#1c1917;border:1px solid #78350f;border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:12px;color:#fbbf24">
-        ⚠ Your session has expired. Please log in again to continue.
+      <div style="background:#052e16;border:1px solid #16a34a;border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:12px;color:#4ade80">
+        ✓ Successfully logged in. Click the Login button below to log in again.
       </div>
       <button class="login-btn" onclick="showLogin()">Login via ReturnPortal →</button>
     </div>
@@ -521,22 +548,26 @@ export const CHALLENGES = {
       targetName: "ProfileHub",
       editorLanguage: "plaintext",
       sandboxType: "srcdoc", // stateless — no Docker container needed
+      editorLabel: "Username",
+      editorAction: "Save Profile",
+      editorHint: "Your input is reflected into the value attribute of an HTML input element. Try a payload that closes the attribute with \" and injects an event handler. After saving, click the username field in the preview to trigger it.",
+      editorPlaceholder: `" event="...`,
       summary: "Break out of an HTML attribute and inject an event handler.",
       description:
-        "ProfileHub is an internal employee directory tool. Staff can update their display name, and the updated name is reflected back in the username field so you can see what was saved.\n\nThe developer added a filter that strips <script> tags — but the username goes directly into an HTML attribute without escaping quotes.\n\nTo find the vulnerability:\n· Enter any text and View Frame Source. Find the comment near the username input.\n· Think about where exactly your input lands. Does injecting <script> work inside an attribute value?",
+        "ProfileHub is an internal employee directory tool. Staff can update their display name, and the updated name is reflected back in the username field so you can see what was saved.\n\nThe developer added a filter that strips <script> tags — but the username goes directly into an HTML attribute without escaping quotes.\n\nTo find the vulnerability:\n· Enter any text and View Frame Source. Find the comment near the username input.\n· Think about where exactly your input lands. Does injecting <script> work inside an attribute value?\n· Once you've injected your payload, click the username field in the preview to trigger it.",
       goal: "Make the page execute alert('xss') by breaking out of the value attribute and injecting an event handler",
       hints: [
         "View Frame Source and find where your input appears in the HTML. Is it inside a tag or inside an attribute value? A <script> tag injected inside value=\"...\" is treated as text, not code.",
         "Your input lands inside value=\"...\". The \" character closes the attribute. Once outside it, you can add new attributes to the same element.",
-        "Event handler attributes run JavaScript when a user event fires. onfocus runs when an element receives focus. onmouseover runs when the mouse hovers. Both are just HTML attributes.",
-        "The payload is: \" autofocus onfocus=\"alert(1) — the \" closes the value attribute, autofocus tells the browser to focus the field immediately, and onfocus fires the code.",
+        "Event handler attributes run JavaScript when a user event fires. onclick runs when an element is clicked. onmouseover runs when the mouse hovers. Both are just HTML attributes — you can add them anywhere a normal attribute goes.",
+        "The payload is: \" onclick=\"alert('xss') — the \" closes the value attribute, and onclick fires when you click the field. Inject the payload then click the username input in the preview.",
       ],
       solution: {
-        payload: "\" autofocus onfocus=\"alert(1)",
+        payload: "\" onclick=\"alert('xss')",
         explanation: [
           "Your input was placed inside value=\"...\" without escaping the quote character. Injecting \" closed the attribute early.",
           "After the closing quote, you were now writing raw HTML attributes on the <input> element. autofocus and onfocus are valid HTML attributes — the browser parsed them as such.",
-          "autofocus makes the browser focus the field as soon as the page loads, which triggers the onfocus event handler — no user interaction needed.",
+          "onclick fires the moment the element is clicked — clicking the username field after injecting triggers the handler immediately.",
           "The developer's <script> filter was useless here. The attack never used a script tag — it used an event handler attribute, which is a completely different injection context.",
         ],
       },
@@ -630,7 +661,7 @@ export const CHALLENGES = {
             { text: "↑ username inserted into attribute — quotes not escaped", cls: "block text-xs text-yellow-600 mt-1 pl-1", delay: 0.4 },
           ],
         },
-        { type: "arrow", delay: 0.7, label: 'payload: " autofocus onfocus="alert(1)' },
+        { type: "arrow", delay: 0.7, label: `payload: " onclick="alert('xss')` },
         {
           type: "block",
           label: "rendered in browser",
@@ -641,10 +672,9 @@ export const CHALLENGES = {
             { text: "value=", cls: "text-gray-400" },
             { text: '"', cls: "text-gray-400" },
             { text: '"', cls: "text-orange-400 font-bold", delay: 1.1 },
-            { text: " autofocus", cls: "text-red-400 font-bold", delay: 1.3 },
-            { text: " onfocus=", cls: "text-gray-400", delay: 1.3 },
+            { text: " onclick=", cls: "text-red-400 font-bold", delay: 1.3 },
             { text: '"', cls: "text-gray-400", delay: 1.3 },
-            { text: "alert(1)", cls: "text-red-400 font-bold", delay: 1.5 },
+            { text: "alert('xss')", cls: "text-red-400 font-bold", delay: 1.5 },
             { text: '"', cls: "text-gray-400", delay: 1.5 },
             { text: ">", cls: "text-gray-500", delay: 1.5 },
             { text: "↑ quote closed the attribute — event handler injected as a new attribute", cls: "block text-xs text-red-500 mt-1 pl-1", delay: 1.7 },
@@ -655,9 +685,8 @@ export const CHALLENGES = {
           delay: 2.0,
           items: [
             { code: '"', codeCls: "text-orange-400", desc: "closes the value attribute — you are now writing raw HTML attributes", delay: 2.0 },
-            { code: "autofocus", codeCls: "text-red-400", desc: "makes the browser focus this field on page load", delay: 2.2 },
-            { code: "onfocus", codeCls: "text-red-400", desc: "event handler — fires when the field receives focus", delay: 2.4 },
-            { code: "alert(1)", codeCls: "text-red-400", desc: "the JavaScript that runs — executes in the page context", delay: 2.6 },
+            { code: "onclick", codeCls: "text-red-400", desc: "event handler — fires when the element is clicked", delay: 2.2 },
+            { code: "alert('xss')", codeCls: "text-red-400", desc: "the JavaScript that runs — executes in the page context", delay: 2.6 },
           ],
         },
       ],
@@ -671,6 +700,10 @@ export const CHALLENGES = {
       editorLanguage: "html",
       sandboxType: "container", // requires Docker — needs server-side state (stored posts,
                                 // real Set-Cookie header, HTTP /logCookie endpoint for exfiltration)
+      editorLabel: "Note Body",
+      editorAction: "Post Note",
+      editorHint: "Your note is saved to the server and rendered for every future visitor. Inject a script that silently reads document.cookie and sends it to an endpoint on the page.",
+      editorPlaceholder: "<script>...</script>",
       summary: "Store a payload that silently exfiltrates the session cookie from every visitor.",
       description:
         "NoteNest is a public note-sharing app. Every note you post is saved and shown to every visitor — permanently.\n\nAt the top of the page you'll see: session=ADMIN_TOKEN_7f3kq9. That's a cookie — a small piece of data the server stores in your browser to remember who you are. As long as you have it, the server treats you as the admin. If an attacker copies it, they can impersonate you without ever knowing your password.\n\nTo steal it, you'll need to:\n· Read the cookie value using JavaScript\n· Find an endpoint on the page that can receive data\n· Send the cookie to that endpoint silently",
