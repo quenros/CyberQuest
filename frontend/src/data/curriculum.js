@@ -1,23 +1,34 @@
-// Ordered curriculum per topic — mix of lectures and challenges.
-// Add entries here as new content is created.
-export const CURRICULUM = {
-  xss: [
-    {
-      type: "lecture",
-      title: "Introduction to XSS",
-      description: "Learn what XSS is, how it works, and why it's dangerous.",
-      route: "/learn/xss",
-    },
-    {
-      type: "challenge",
-      title: "Challenge 1: The Comment Board",
-      description: "Inject a script into an unsanitized comment field.",
-      route: "/challenges/xss/0",
-      difficulty: 1,
-      points: 100,
-    },
-    // Lecture 2 and Challenges 2–4 to be added
-  ],
-  sqli: [],
-  csrf: [],
-};
+import { TOPICS } from "./topics";
+import { CHALLENGES } from "./challenges";
+
+function buildCurriculum() {
+  return Object.fromEntries(
+    TOPICS.map((topic) => {
+      const items = [];
+
+      if (topic.lecture) {
+        items.push({
+          type: "lecture",
+          title: topic.lecture.title,
+          description: topic.lecture.description,
+          route: `/learn/${topic.id}`,
+        });
+      }
+
+      (CHALLENGES[topic.id] ?? []).forEach((challenge, i) => {
+        items.push({
+          type: "challenge",
+          title: challenge.title,
+          description: challenge.summary,
+          route: `/challenges/${topic.id}/${i}`,
+          difficulty: challenge.difficulty,
+          points: challenge.points,
+        });
+      });
+
+      return [topic.id, items];
+    })
+  );
+}
+
+export const CURRICULUM = buildCurriculum();

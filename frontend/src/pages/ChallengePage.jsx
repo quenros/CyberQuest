@@ -4,8 +4,34 @@ import { useNavigate, useParams } from "react-router-dom";
 import Editor from "@monaco-editor/react";
 import api from "../api/client";
 import { CHALLENGES } from "../data/challenges";
+import SolutionAnimation from "../components/SolutionAnimation";
 
 const MIN_W = 200;
+
+// ─── Template helpers (srcdoc challenges only) ───────────────────────────────
+
+function escapeHtml(str) {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+// Replaces {payload}, {payload_escaped}, {show_if_payload} in a page template.
+// {payload}           → raw payload (the intentional vulnerability)
+// {payload_escaped}   → HTML-escaped payload (safe for attributes / display text)
+// {show_if_payload}   → "display:none" when empty, "" otherwise
+function substituteTemplate(template, payload) {
+  const escaped = escapeHtml(payload);
+  return template
+    .replace(/\{payload_escaped\}/g, escaped)
+    .replace(/\{show_if_payload\}/g, payload ? "" : "display:none")
+    .replace(/\{payload\}/g, payload);
+}
+
+// ─── Shared sub-components ───────────────────────────────────────────────────
 
 function DragHandle({ onDrag }) {
   const dragging = useRef(false);
@@ -13,9 +39,13 @@ function DragHandle({ onDrag }) {
   const onMouseDown = useCallback((e) => {
     e.preventDefault();
     dragging.current = true;
+    // Iframes absorb mouse events and break drag tracking once the cursor enters them.
+    // Disable pointer events on all iframes for the duration of the drag.
+    document.querySelectorAll("iframe").forEach((f) => (f.style.pointerEvents = "none"));
     const onMove = (e) => { if (dragging.current) onDrag(e.movementX); };
     const onUp   = () => {
       dragging.current = false;
+      document.querySelectorAll("iframe").forEach((f) => (f.style.pointerEvents = ""));
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
     };
@@ -48,7 +78,7 @@ function ExitWarningModal({ onStay, onLeave }) {
       <motion.div
         initial={{ scale: 0.9, y: 16 }}
         animate={{ scale: 1, y: 0 }}
-        className="rounded-2xl bg-gray-900 border border-gray-700 p-8 text-center shadow-2xl max-w-sm w-full"
+        className="rounded-2xl bg-gray-900 border border-gray-700 p-8 text-center shadow-2xl max-w-md w-full"
       >
         <div className="text-4xl mb-4">⚠️</div>
         <h2 className="text-xl font-bold mb-2">Leave this challenge?</h2>
@@ -74,6 +104,107 @@ function ExitWarningModal({ onStay, onLeave }) {
   );
 }
 
+function SolutionConfirmModal({ onCancel, onReveal }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 flex items-center justify-center bg-black/70 z-50"
+    >
+      <motion.div
+        initial={{ scale: 0.9, y: 16 }}
+        animate={{ scale: 1, y: 0 }}
+        className="rounded-2xl bg-gray-900 border border-gray-700 p-8 text-center shadow-2xl max-w-md w-full"
+      >
+        <div className="text-4xl mb-4">🔓</div>
+        <h2 className="text-xl font-bold mb-2">Reveal the solution?</h2>
+        <p className="text-sm text-gray-400 mb-6">
+          This will show you the exact payload and explain how it works. Try the hints first — they might be all you need.
+        </p>
+        <div className="flex gap-3">
+          <button
+            onClick={onCancel}
+            className="flex-1 rounded-lg border border-gray-700 py-2 text-sm text-gray-400 hover:border-gray-500 hover:text-white transition-colors"
+          >
+            Keep trying
+          </button>
+          <button
+            onClick={onReveal}
+            className="flex-1 rounded-lg bg-orange-500/80 py-2 text-sm font-semibold text-white hover:bg-orange-500 transition-colors"
+          >
+            Show solution
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+function DefenseSection({ defense }) {
+  if (!defense) return null;
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.15, duration: 0.35 }}
+      className="rounded-lg border border-blue-500/20 bg-blue-500/5 p-3 flex flex-col gap-2.5"
+    >
+      <p className="text-xs font-semibold uppercase tracking-widest text-blue-400">🛡 How to defend</p>
+      <p className="text-sm text-gray-400 leading-relaxed">{defense.summary}</p>
+      <div className="flex flex-col gap-2.5 border-t border-blue-500/10 pt-2">
+        {defense.measures.map((m, i) => (
+          <div key={i}>
+            <p className="text-sm font-semibold text-blue-300 mb-0.5">{m.title}</p>
+            <p className="text-sm text-gray-500 leading-relaxed">{m.body}</p>
+          </div>
+        ))}
+      </div>
+    </motion.div>
+  );
+}
+
+function SolutionBox({ solution, solved, animation, defense }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      className={`rounded-xl border p-4 flex flex-col gap-4 ${
+        solved
+          ? "border-green-500/30 bg-green-500/5"
+          : "border-orange-500/30 bg-orange-500/5"
+      }`}
+    >
+      <p className={`text-xs font-semibold uppercase tracking-widest ${
+        solved ? "text-green-400" : "text-orange-400"
+      }`}>
+        {solved ? "How you did it" : "Solution"}
+      </p>
+
+      <SolutionAnimation animation={animation} />
+
+      <div className="border-t border-gray-800 pt-3 select-text">
+        {Array.isArray(solution.explanation) ? (
+          <ul className="flex flex-col gap-2">
+            {solution.explanation.map((point, i) => (
+              <li key={i} className="flex gap-2 text-sm text-gray-300 leading-relaxed">
+                <span className="text-gray-600 flex-shrink-0 mt-px">·</span>
+                <span>{point}</span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-sm text-gray-300 leading-relaxed">{solution.explanation}</p>
+        )}
+      </div>
+
+      <DefenseSection defense={defense} />
+    </motion.div>
+  );
+}
+
+// ─── Main page ───────────────────────────────────────────────────────────────
+
 export default function ChallengePage({ alias }) {
   const navigate = useNavigate();
   const { topicId, index } = useParams();
@@ -82,31 +213,45 @@ export default function ChallengePage({ alias }) {
   const challenge = topicChallenges[challengeIndex];
   const hasNext = challengeIndex < topicChallenges.length - 1;
 
-  // Reset all state when challenge changes
-  const [payload, setPayload]       = useState("");
+  const isSrcdoc = challenge?.sandboxType === "srcdoc";
+
+  const [payload, setPayload]         = useState("");
   const [sandboxPort, setSandboxPort] = useState(null);
-  const [loading, setLoading]       = useState(true);
-  const [solved, setSolved]         = useState(false);
-  const [showModal, setShowModal]   = useState(false);
-  const [hintIndex, setHintIndex]   = useState(-1);
-  const [submitting, setSubmitting] = useState(false);
-  const [showExitWarning, setShowExitWarning] = useState(false);
-  const [pendingNav, setPendingNav] = useState(null);
-  const [leftW, setLeftW]   = useState(300);
+  // srcdoc challenges are ready immediately; container challenges wait for the sandbox
+  const [loading, setLoading]         = useState(!isSrcdoc);
+  const [srcdoc, setSrcdoc]           = useState(
+    isSrcdoc ? substituteTemplate(challenge.pageTemplate, "") : ""
+  );
+  const [sandboxError, setSandboxError] = useState(null);
+  const [solved, setSolved]           = useState(false);
+  const [showModal, setShowModal]     = useState(false);
+  const [hintIndex, setHintIndex]     = useState(-1);
+  const [submitting, setSubmitting]   = useState(false);
+  const [showExitWarning, setShowExitWarning]   = useState(false);
+  const [pendingNav, setPendingNav]             = useState(null);
+  const [showSolution, setShowSolution]         = useState(false);
+  const [confirmSolution, setConfirmSolution]   = useState(false);
+  const [leftW, setLeftW]     = useState(450);
   const [centerW, setCenterW] = useState(380);
 
   const iframeRef       = useRef(null);
-  const intervalRef     = useRef(null);
-  const challengeRef    = useRef(challenge);
   const isNavigatingRef = useRef(false);
 
-  // Keep challengeRef current; reset guard on challenge change
+  // ── postMessage listener — replaces the old polling approach ──────────────
+  // The vulnerable page sends { type: 'xss-triggered' } to the parent frame
+  // the moment the XSS fires, making detection instant with no server round-trip.
   useEffect(() => {
-    challengeRef.current = challenge;
-    isNavigatingRef.current = false;
-  }, [challenge]);
+    function onMessage(e) {
+      if (e.data?.type === "xss-triggered") {
+        setSolved(true);
+        setShowModal(true);
+      }
+    }
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, []);
 
-  // Reset state and restart sandbox whenever challenge changes
+  // ── Challenge lifecycle ───────────────────────────────────────────────────
   useEffect(() => {
     let cancelled = false;
 
@@ -116,61 +261,75 @@ export default function ChallengePage({ alias }) {
     setHintIndex(-1);
     setSubmitting(false);
     setSandboxPort(null);
-    setLoading(true);
-    clearInterval(intervalRef.current);
+    setSandboxError(null);
+    setShowSolution(false);
+    setConfirmSolution(false);
+    isNavigatingRef.current = false;
 
-    const challengeId = challenge.id;
+    if (isSrcdoc) {
+      setSrcdoc(substituteTemplate(challenge.pageTemplate, ""));
+      setLoading(false);
+      return; // no container to start or stop
+    }
+
+    // Container-based challenge — start the Docker sandbox
+    setLoading(true);
 
     async function start() {
       try {
-        const { data } = await api.post("/sandbox/start", { alias, challenge_id: challengeId });
+        const { data } = await api.post("/sandbox/start", {
+          alias,
+          challenge_id: challenge.id,
+        });
         if (cancelled) return;
         setSandboxPort(data.port);
-
-        intervalRef.current = setInterval(async () => {
-          if (cancelled) return;
-          try {
-            const { data } = await api.get("/sandbox/status", {
-              params: { alias, challenge_id: challengeId },
-            });
-            if (data.xss_triggered && !cancelled) {
-              clearInterval(intervalRef.current);
-              setSolved(true);
-              setShowModal(true);
-            }
-          } catch { /* ignore poll errors */ }
-        }, 2000);
-      } catch { /* ignore start errors */ }
-      finally { if (!cancelled) setLoading(false); }
+      } catch (err) {
+        if (!cancelled) setSandboxError(
+          err?.response?.data?.error ?? "Failed to start sandbox. Is Docker running and the image built?"
+        );
+      } finally { if (!cancelled) setLoading(false); }
     }
 
     start();
 
     return () => {
       cancelled = true;
-      clearInterval(intervalRef.current);
+      // Stop the container when the user leaves or the challenge changes.
+      // Fire-and-forget: we don't await this so navigation isn't blocked.
+      api.post("/sandbox/stop", { alias, challenge_id: challenge.id }).catch(() => {});
     };
   }, [topicId, challengeIndex]);
 
-  // Warn on browser refresh/close
   useEffect(() => {
     const handler = (e) => { e.preventDefault(); e.returnValue = ""; };
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
   }, []);
 
+  // ── Payload submission ────────────────────────────────────────────────────
+
   function submitPayload() {
-    if (!sandboxPort || !payload.trim()) return;
+    const trimmed = payload.trim();
+    if (!trimmed || submitting || solved) return;
     setSubmitting(true);
-    if (iframeRef.current)
-      iframeRef.current.src = `http://localhost:${sandboxPort}/?comment=${encodeURIComponent(payload)}`;
+
+    if (isSrcdoc) {
+      // Substitute payload into the page template and update srcdoc.
+      // {payload} is inserted raw (the vulnerability); {payload_escaped} is safe.
+      setSrcdoc(substituteTemplate(challenge.pageTemplate, trimmed));
+    } else if (sandboxPort && iframeRef.current) {
+      const path = challenge.injectPath.replace("{payload}", encodeURIComponent(trimmed));
+      iframeRef.current.src = `http://localhost:${sandboxPort}${path}`;
+    }
+
     setTimeout(() => setSubmitting(false), 800);
   }
+
+  // ── Navigation helpers ────────────────────────────────────────────────────
 
   function doNavigate(destination) {
     if (isNavigatingRef.current) return;
     isNavigatingRef.current = true;
-    clearInterval(intervalRef.current);
     navigate(destination);
   }
 
@@ -193,6 +352,8 @@ export default function ChallengePage({ alias }) {
     doNavigate(dest);
   }
 
+  // ── Guard ─────────────────────────────────────────────────────────────────
+
   if (!challenge) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-950 text-gray-400">
@@ -202,14 +363,17 @@ export default function ChallengePage({ alias }) {
   }
 
   const stars = "★".repeat(challenge.difficulty) + "☆".repeat(5 - challenge.difficulty);
+  const showSolutionBox = showSolution || solved;
+
+  // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex min-h-screen flex-col bg-gray-950 text-gray-100 select-none">
+    <div className="flex h-screen flex-col bg-gray-950 text-gray-100 overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-gray-800 px-6 py-3 flex-shrink-0">
         <div className="flex items-center gap-4">
           <button
-            onClick={() => requestNav(-1)}
+            onClick={() => requestNav("/")}
             className="text-sm text-gray-400 hover:text-white transition-colors"
           >
             ← Back
@@ -222,7 +386,7 @@ export default function ChallengePage({ alias }) {
       </div>
 
       <div className="flex flex-1 overflow-hidden">
-        {/* Left panel — brief */}
+        {/* Left panel */}
         <aside
           style={{ width: leftW, minWidth: MIN_W }}
           className="flex flex-shrink-0 flex-col gap-5 border-r border-gray-800 p-6 overflow-y-auto"
@@ -245,8 +409,8 @@ export default function ChallengePage({ alias }) {
             </p>
           </div>
 
-          {/* Hints + next challenge */}
-          <div className="mt-auto flex flex-col gap-2">
+          {/* Actions section */}
+          <div className="flex flex-col gap-2">
             <AnimatePresence>
               {solved && (
                 <motion.button
@@ -261,6 +425,17 @@ export default function ChallengePage({ alias }) {
                 >
                   {hasNext ? "Next Challenge →" : "All done! Back to Dashboard →"}
                 </motion.button>
+              )}
+            </AnimatePresence>
+
+            <AnimatePresence>
+              {showSolutionBox && challenge.solution && (
+                <SolutionBox
+                  solution={challenge.solution}
+                  solved={solved}
+                  animation={challenge.animation}
+                  defense={challenge.defense}
+                />
               )}
             </AnimatePresence>
 
@@ -285,6 +460,15 @@ export default function ChallengePage({ alias }) {
                 {hintIndex === -1 ? "💡 Get a hint" : "💡 Another hint"}
               </button>
             )}
+
+            {!showSolution && !solved && challenge.solution && (
+              <button
+                onClick={() => setConfirmSolution(true)}
+                className="w-full rounded-lg border border-gray-700 py-2 text-sm text-gray-500 hover:border-orange-500/50 hover:text-orange-400 transition-colors"
+              >
+                👁 Reveal Solution
+              </button>
+            )}
           </div>
         </aside>
 
@@ -301,7 +485,7 @@ export default function ChallengePage({ alias }) {
           <div className="flex-1 overflow-hidden">
             <Editor
               height="100%"
-              defaultLanguage="html"
+              defaultLanguage={challenge.editorLanguage ?? "html"}
               theme="vs-dark"
               value={payload}
               onChange={(v) => setPayload(v || "")}
@@ -327,10 +511,10 @@ export default function ChallengePage({ alias }) {
 
         <DragHandle onDrag={(dx) => setCenterW((w) => Math.max(MIN_W, w + dx))} />
 
-        {/* Right — sandbox iframe */}
+        {/* Right — target sandbox */}
         <div className="flex flex-1 flex-col min-w-0">
           <div className="border-b border-gray-800 px-4 py-2 text-xs text-gray-500 flex-shrink-0">
-            TARGET: ByteBoard
+            TARGET: {challenge.targetName}
           </div>
           <div className="flex-1 bg-white relative">
             {loading && (
@@ -338,13 +522,36 @@ export default function ChallengePage({ alias }) {
                 Starting sandbox...
               </div>
             )}
-            {sandboxPort && (
+            {sandboxError && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-900 gap-3 p-8 text-center">
+                <div className="text-3xl">⚠️</div>
+                <p className="text-red-400 font-semibold text-sm">Sandbox failed to start</p>
+                <p className="text-gray-500 text-xs max-w-xs">{sandboxError}</p>
+                <code className="text-xs text-gray-600 bg-gray-800 rounded px-3 py-1">
+                  docker build -t cyberquest-xss-3 challenges/xss-3-stored
+                </code>
+              </div>
+            )}
+
+            {isSrcdoc ? (
+              // srcdoc challenges render entirely in the browser — no container
               <iframe
                 ref={iframeRef}
-                src={`http://localhost:${sandboxPort}/`}
+                srcDoc={srcdoc}
+                sandbox="allow-scripts"
                 className="h-full w-full border-0"
                 title="Challenge Sandbox"
               />
+            ) : (
+              // container challenges load from the Docker sandbox port
+              sandboxPort && (
+                <iframe
+                  ref={iframeRef}
+                  src={`http://localhost:${sandboxPort}/`}
+                  className="h-full w-full border-0"
+                  title="Challenge Sandbox"
+                />
+              )
             )}
           </div>
         </div>
@@ -362,23 +569,46 @@ export default function ChallengePage({ alias }) {
             <motion.div
               initial={{ scale: 0.8, y: 20 }}
               animate={{ scale: 1, y: 0 }}
-              className="rounded-2xl bg-gray-900 border border-green-500/50 p-10 text-center shadow-2xl max-w-md w-full"
+              className="rounded-2xl bg-gray-900 border border-green-500/50 p-8 shadow-2xl max-w-xl w-full flex flex-col gap-5"
             >
-              <div className="text-5xl mb-4">🎉</div>
-              <h2 className="text-2xl font-bold text-green-400 mb-2">XSS Triggered!</h2>
-              <p className="text-gray-300 mb-1">You injected a script into ByteBoard.</p>
-              <p className="text-sm text-gray-500 mb-6">
-                In a real app, this could steal session cookies, redirect users, or deface the page.
-              </p>
-              <div className="rounded-lg bg-green-500/10 border border-green-500/30 px-4 py-2 text-green-400 font-bold text-lg mb-6">
+              <div className="text-center">
+                <div className="text-5xl mb-3">🎉</div>
+                <h2 className="text-2xl font-bold text-green-400 mb-1">Challenge Solved!</h2>
+                <p className="text-sm text-gray-400">Here's what your payload did and why it worked.</p>
+              </div>
+
+              {challenge.solution && (
+                <div className="flex flex-col gap-3 max-h-96 overflow-y-auto pr-1">
+                  <SolutionAnimation animation={challenge.animation} />
+                  <div className="border-t border-gray-800 pt-3">
+                    {Array.isArray(challenge.solution.explanation) ? (
+                      <ul className="flex flex-col gap-2">
+                        {challenge.solution.explanation.map((point, i) => (
+                          <li key={i} className="flex gap-2 text-sm text-gray-300 leading-relaxed">
+                            <span className="text-gray-600 flex-shrink-0 mt-px">·</span>
+                            <span>{point}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-sm text-gray-300 leading-relaxed">{challenge.solution.explanation}</p>
+                    )}
+                  </div>
+
+                  <DefenseSection defense={challenge.defense} />
+                </div>
+              )}
+
+              <div className="rounded-lg bg-green-500/10 border border-green-500/30 px-4 py-2 text-green-400 font-bold text-lg text-center">
                 +{challenge.points} pts
               </div>
+
               <div className="flex gap-3">
                 <button
                   onClick={() => setShowModal(false)}
                   className="flex-1 rounded-lg border border-gray-700 py-2 text-sm text-gray-400 hover:border-gray-500 hover:text-white transition-colors"
                 >
-                  Review Challenge
+                  See Breakdown →
                 </button>
                 <button
                   onClick={goNextChallenge}
@@ -398,6 +628,16 @@ export default function ChallengePage({ alias }) {
           <ExitWarningModal
             onStay={() => setShowExitWarning(false)}
             onLeave={confirmLeave}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Solution confirm modal */}
+      <AnimatePresence>
+        {confirmSolution && (
+          <SolutionConfirmModal
+            onCancel={() => setConfirmSolution(false)}
+            onReveal={() => { setConfirmSolution(false); setShowSolution(true); }}
           />
         )}
       </AnimatePresence>

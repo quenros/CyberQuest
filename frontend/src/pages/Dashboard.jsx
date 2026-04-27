@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { TOPICS, COLOR_MAP } from "../data/topics";
 import { CURRICULUM } from "../data/curriculum";
+import { CHALLENGES } from "../data/challenges";
 
 const cardVariants = {
   hidden: { opacity: 0, y: 32 },
@@ -83,7 +84,7 @@ export default function Dashboard({ alias }) {
                 </div>
                 <div className="mt-auto flex items-center justify-between text-xs text-gray-500">
                   <span>{"★".repeat(topic.difficulty)}{"☆".repeat(5 - topic.difficulty)} Difficulty</span>
-                  <span>{topic.challengeCount} challenges</span>
+                  <span>{CHALLENGES[topic.id]?.length ?? 0} challenges</span>
                 </div>
               </motion.div>
             );

@@ -1,7 +1,7 @@
 # This container is no longer used.
 #
-# Challenge 1 (Reflected XSS) was migrated to sandboxType "srcdoc" — the
-# vulnerable page is rendered entirely in the browser via the iframe srcDoc
+# Challenge 2 (JS Injection via Search) was migrated to sandboxType "srcdoc" —
+# the vulnerable page is rendered entirely in the browser via the iframe srcDoc
 # attribute, with the HTML template stored in frontend/src/data/challenges.js.
 #
 # No Docker container is needed because:

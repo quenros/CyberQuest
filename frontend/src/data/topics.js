@@ -5,10 +5,13 @@ export const TOPICS = [
     shortTitle: "XSS",
     description: "Inject malicious scripts into web pages viewed by other users.",
     difficulty: 1,
-    challengeCount: 4,
     color: "cyan",
     icon: "⚡",
     unlocked: true,
+    lecture: {
+      title: "Introduction to XSS",
+      description: "Learn what XSS is, how it works, and why it's dangerous.",
+    },
   },
   {
     id: "sqli",
@@ -16,10 +19,13 @@ export const TOPICS = [
     shortTitle: "SQLi",
     description: "Manipulate database queries to extract or destroy data.",
     difficulty: 2,
-    challengeCount: 4,
     color: "orange",
     icon: "🗄️",
     unlocked: false,
+    lecture: {
+      title: "Introduction to SQL Injection",
+      description: "Learn how attackers manipulate database queries through unsanitized input.",
+    },
   },
   {
     id: "csrf",
@@ -27,10 +33,13 @@ export const TOPICS = [
     shortTitle: "CSRF",
     description: "Trick users into performing actions they didn't intend.",
     difficulty: 3,
-    challengeCount: 3,
     color: "purple",
     icon: "🎭",
     unlocked: false,
+    lecture: {
+      title: "Introduction to CSRF",
+      description: "Learn how attackers forge requests on behalf of authenticated users.",
+    },
   },
 ];
 
