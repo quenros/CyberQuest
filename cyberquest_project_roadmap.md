@@ -35,6 +35,53 @@ React, Tailwind CSS, Framer Motion, Flask, MongoDB, Docker, Claude API (AI hints
 
 ---
 
+## Development Changelog
+
+### Checkpoint — 2026-04-27
+
+#### XSS Module — Challenge & Content Polish
+
+**Challenge 3 (ReturnPortal — javascript: URI injection)**
+- Starting state changed: page now opens on ReturnPortal (login success screen) instead of CorpDash, matching the real-world narrative of being redirected to a login service
+- After clicking "Return to previous page" with no payload, CorpDash now shows a green "Successfully logged in" message instead of the amber "session expired" warning
+- Defense section now includes a before/after code block showing the vulnerable click handler vs. the secure version (allowlist `^https?://` scheme check)
+
+**Challenge 4 (ProfileHub — attribute injection)**
+- Fixed non-functional payload: `autofocus onfocus` does not fire in sandboxed iframes without prior user gesture; replaced with `onclick` which fires reliably on user click
+- Solution payload, hint 4, animation arrow/segments/legend all updated from `alert(1)` → `alert('xss')` to match the stated goal
+- Challenge description now includes the trigger instruction: "click the username field in the preview after injecting"
+- Hint 3 updated to foreground `onclick` alongside `onmouseover`
+
+#### Payload Editor — Context-Aware UI
+
+Added four new data fields to every challenge in `challenges.js`:
+
+| Field | Purpose |
+|---|---|
+| `editorLabel` | Panel header label (e.g. "Payload", "Search Query", "Return URL", "Username", "Note Body") |
+| `editorAction` | Inject button text (e.g. "Inject into Page", "Set Return URL", "Save Profile", "Post Note") |
+| `editorHint` | Tooltip text shown on hover of the ⓘ icon — explains what the editor does in challenge context |
+| `editorPlaceholder` | Format hint shown faintly below the label when the editor is empty |
+
+`ChallengePage.jsx` updated to:
+- Render `editorLabel` in the panel header (replaces hardcoded "PAYLOAD EDITOR")
+- Show an ⓘ icon that reveals an animated tooltip with `editorHint` on hover
+- Show `editorPlaceholder` as a faint hint below the label when the editor is empty
+- Use `editorAction` as the button label; pending state is now "Working..."
+
+#### Learn Page — Injection Visualisation
+
+- New `InjectionSection` component added (`components/learn/InjectionSection.jsx`)
+- Renders a two-panel before/after: server template with the vulnerable placeholder highlighted in amber, and the browser output with the injected payload highlighted in red
+- Added to the XSS learn page between the "What a payload looks like" code section and the "Why is it dangerous?" cards
+- `LearnPage.jsx` wired to handle the new `"injection"` section type
+
+#### Infrastructure
+- `.env` and `.env.example` created for the backend — `MONGO_URI` must include the database name (`/cyberquest`) for `get_default_database()` to resolve correctly
+- `README.md` updated with MongoDB setup instructions, env var table, and a callout for the common URI error
+
+---
+
 ## Technical Architecture
 
 ### Tech Stack
@@ -160,11 +207,13 @@ React, Tailwind CSS, Framer Motion, Flask, MongoDB, Docker, Claude API (AI hints
 - Validate the concept works
 
 #### Content Creation
-- [ ] Interactive XSS demo (vulnerable comment form)
-- [ ] Challenge 1: Basic XSS (obvious input, heavy hints)
-- [ ] Challenge 2: Search bar XSS (find the vulnerability)
-- [ ] Challenge 3: Stored XSS (more complex)
-- [ ] Challenge 4: Filter bypass (encoded payloads)
+- [x] Interactive XSS learn page (intro, attack flow, injection visualiser, danger cards, XSS types)
+- [x] Challenge 1: Reflected XSS — comment board (`<script>` injection)
+- [x] Challenge 2: JS string context — analytics script (`"; alert('xss')//`)
+- [x] Challenge 3: javascript: URI injection — ReturnPortal login redirect
+- [x] Challenge 4: Attribute injection — ProfileHub username field (`onclick`)
+- [x] Challenge 5: Stored XSS — NoteNest cookie exfiltration (Docker container)
+- [ ] Challenge 6+: Burp Suite challenges (HTTP header XSS, encoded XSS, CSP bypass) — deferred, tutorial required first
 
 #### AI Features
 - [ ] Contextual hints based on student attempts
@@ -262,6 +311,7 @@ React, Tailwind CSS, Framer Motion, Flask, MongoDB, Docker, Claude API (AI hints
 - 🔲 Custom challenge builder
 - 🔲 Code playback (watch student's attempts)
 - 🔲 Peer code review features
+- 🔲 Burp Suite module — embedded setup tutorial + 3 professional-tooling challenges (HTTP header injection, encoded XSS, CSP bypass)
 
 ---
 
@@ -270,21 +320,46 @@ React, Tailwind CSS, Framer Motion, Flask, MongoDB, Docker, Claude API (AI hints
 ### Module Priority Order
 
 #### Tier 1 (MVP - Week 3-6)
-1. **XSS (Cross-Site Scripting)** - Most visual, immediate feedback
-2. **SQL Injection** - Classic, students love "hacking" databases
+1. **XSS (Cross-Site Scripting)** ✅ In progress — 5 challenges built
+   - ✅ Challenge 1: Reflected XSS — comment board (`<script>` tag injection)
+   - ✅ Challenge 2: JS string context — analytics script (`"; alert('xss')//`)
+   - ✅ Challenge 3: javascript: URI — ReturnPortal login redirect
+   - ✅ Challenge 4: Attribute injection — ProfileHub username field (`onclick`)
+   - ✅ Challenge 5: Stored XSS — NoteNest cookie exfiltration (Docker container)
+   - ✅ Learn page with intro, attack flow, code example, injection visualiser, danger cards, XSS types
+2. **SQL Injection** — Classic, students love "hacking" databases
 
 #### Tier 2 (Week 7-8)
-3. **Input Validation** - Foundation concept, ties to both XSS and SQL
+3. **Input Validation** — Foundation concept, ties to both XSS and SQL
 
 #### Tier 3 (Post-MVP)
-4. **CSRF** - More complex, requires understanding sessions
-5. **Session Management** - Cookie security, hijacking
-6. **Authentication Bypass** - Combines multiple concepts
+4. **CSRF** — More complex, requires understanding sessions
+5. **Session Management** — Cookie security, hijacking
+6. **Authentication Bypass** — Combines multiple concepts
 
 #### Tier 4 (Future)
-7. **Network Basics** - Packet analysis games
-8. **SIEM/Log Analysis** - Pattern recognition challenges
-9. **Secure Coding** - Code review challenges
+7. **Burp Suite Module** — Professional tooling (see note below)
+8. **Network Basics** — Packet analysis games
+9. **SIEM/Log Analysis** — Pattern recognition challenges
+10. **Secure Coding** — Code review challenges
+
+> **Burp Suite Module — Planning Note**
+>
+> Burp Suite (Community Edition, free) is the industry-standard web security testing proxy. Adding it to CyberQuest would bridge the gap between "understanding attacks conceptually" and "how professionals actually find and test them."
+>
+> **Requires before building:**
+> - A setup tutorial embedded in the platform (proxy config, browser cert install, Burp basics — Intercept, Repeater, Decoder tabs)
+> - All Burp challenges must use Docker containers (real HTTP server, real headers) — srcdoc won't work
+>
+> **Proposed challenge ideas (difficulty 3–4, after XSS set):**
+>
+> | Challenge | Burp Feature Used | Concept Taught |
+> |---|---|---|
+> | HTTP header injection XSS (`User-Agent` / `Referer` reflected in admin log) | Intercept + modify request headers | XSS vectors outside form inputs |
+> | Encoded/obfuscated XSS (app decodes URL-encoding server-side, raw `<script>` blocked) | Decoder tab to craft double-encoded payload | WAF/filter bypass techniques |
+> | CSP bypass (misconfigured Content Security Policy) | Repeater to inspect response headers, identify bypass | Reading and analysing security headers |
+>
+> **Decision:** Build the tutorial first, then layer in challenges one at a time. Start with HTTP header injection XSS as it has the clearest "you need Burp for this" motivation.
 
 ---
 

@@ -8,6 +8,27 @@ import SolutionAnimation from "../components/SolutionAnimation";
 
 const MIN_W = 200;
 
+function EditorHintButton({ hint }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="relative" onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
+      <button className="w-4 h-4 rounded-full border border-gray-600 text-gray-500 hover:text-gray-300 hover:border-gray-400 flex items-center justify-center text-[10px] leading-none transition-colors">
+        i
+      </button>
+      {open && (
+        <motion.div
+          initial={{ opacity: 0, y: -4 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.15 }}
+          className="absolute right-0 top-6 z-50 w-64 rounded-lg border border-gray-700 bg-gray-900 p-3 text-xs text-gray-300 leading-relaxed shadow-xl"
+        >
+          {hint}
+        </motion.div>
+      )}
+    </div>
+  );
+}
+
 // ─── Template helpers (srcdoc challenges only) ───────────────────────────────
 
 function escapeHtml(str) {
@@ -157,6 +178,11 @@ function DefenseSection({ defense }) {
           <div key={i}>
             <p className="text-sm font-semibold text-blue-300 mb-0.5">{m.title}</p>
             <p className="text-sm text-gray-500 leading-relaxed">{m.body}</p>
+            {m.code && (
+              <pre className="mt-2 text-xs text-gray-300 bg-gray-950 border border-gray-700/60 rounded-lg p-3 overflow-x-auto leading-relaxed font-mono whitespace-pre select-text">
+                {m.code}
+              </pre>
+            )}
           </div>
         ))}
       </div>
@@ -479,8 +505,18 @@ export default function ChallengePage({ alias }) {
           style={{ width: centerW, minWidth: MIN_W }}
           className="flex flex-shrink-0 flex-col border-r border-gray-800"
         >
-          <div className="border-b border-gray-800 px-4 py-2 text-xs text-gray-500 flex-shrink-0">
-            PAYLOAD EDITOR
+          <div className="border-b border-gray-800 px-4 py-2.5 flex-shrink-0">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-gray-500 uppercase tracking-wider">
+                {challenge.editorLabel ?? "Payload"}
+              </span>
+              {challenge.editorHint && <EditorHintButton hint={challenge.editorHint} />}
+            </div>
+            {!payload && challenge.editorPlaceholder && (
+              <p className="mt-1 text-xs text-gray-700 font-mono truncate">
+                e.g. {challenge.editorPlaceholder}
+              </p>
+            )}
           </div>
           <div className="flex-1 overflow-hidden">
             <Editor
@@ -504,7 +540,7 @@ export default function ChallengePage({ alias }) {
               disabled={submitting || loading || solved}
               className="w-full rounded-lg bg-cyan-500 py-2 font-semibold text-gray-950 hover:bg-cyan-400 transition-colors disabled:opacity-50"
             >
-              {submitting ? "Injecting..." : "Inject Payload"}
+              {submitting ? "Working..." : (challenge.editorAction ?? "Inject Payload")}
             </button>
           </div>
         </div>

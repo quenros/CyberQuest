@@ -31,6 +31,22 @@ export const LEARN_CONTENT = {
 <!-- The browser sees and executes the script -->`,
       },
       {
+        type: "injection",
+        heading: "How injection works",
+        before: {
+          label: "Server template (vulnerable)",
+          code: `<div class="comment">\n  {userInput}\n</div>`,
+          highlight: "{userInput}",
+          caption: "The server pastes the user's input directly into the HTML — no cleaning, no escaping.",
+        },
+        after: {
+          label: "What the browser receives",
+          code: `<div class="comment">\n  <script>alert('xss')</script>\n</div>`,
+          highlight: "<script>alert('xss')</script>",
+          caption: "The browser sees a real script tag and executes it immediately — it has no way to tell it wasn't always there.",
+        },
+      },
+      {
         type: "cards",
         heading: "Why is it dangerous?",
         items: [
