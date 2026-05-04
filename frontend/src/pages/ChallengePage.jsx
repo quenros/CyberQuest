@@ -319,7 +319,7 @@ export default function ChallengePage({ alias }) {
       setSrcdoc(substituteTemplate(challenge.pageTemplate, trimmed));
     } else if (sandboxPort && iframeRef.current) {
       const path = challenge.injectPath.replace("{payload}", encodeURIComponent(trimmed));
-      iframeRef.current.src = `http://localhost:${sandboxPort}${path}`;
+      iframeRef.current.src = `/api/sandbox/proxy/${sandboxPort}${path}`;
     }
 
     setTimeout(() => setSubmitting(false), 800);
@@ -547,7 +547,7 @@ export default function ChallengePage({ alias }) {
               sandboxPort && (
                 <iframe
                   ref={iframeRef}
-                  src={`http://localhost:${sandboxPort}/`}
+                  src={`/api/sandbox/proxy/${sandboxPort}/`}
                   className="h-full w-full border-0"
                   title="Challenge Sandbox"
                 />

@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
 import Editor from "@monaco-editor/react";
 
-export default function CodeSection({ heading, code }) {
+export default function CodeSection({ heading, code, language = "html", filename = "example.html" }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 24 }}
@@ -16,11 +16,11 @@ export default function CodeSection({ heading, code }) {
           <span className="w-3 h-4 rounded-full bg-red-500/70" />
           <span className="w-3 h-4 rounded-full bg-yellow-500/70" />
           <span className="w-3 h-4 rounded-full bg-green-500/70" />
-          <span className="ml-2 text-xs text-gray-500">example.html</span>
+          <span className="ml-2 text-xs text-gray-500">{filename}</span>
         </div>
         <Editor
           height="160px"
-          defaultLanguage="html"
+          defaultLanguage={language}
           theme="vs-dark"
           value={code}
           options={{

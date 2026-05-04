@@ -21,7 +21,7 @@ export const TOPICS = [
     difficulty: 2,
     color: "orange",
     icon: "🗄️",
-    unlocked: false,
+    unlocked: true,
     lecture: {
       title: "Introduction to SQL Injection",
       description: "Learn how attackers manipulate database queries through unsanitized input.",

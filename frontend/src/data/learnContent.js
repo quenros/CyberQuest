@@ -121,4 +121,135 @@ export const LEARN_CONTENT = {
       },
     ],
   },
+
+  sqli: {
+    title: "SQL Injection (SQLi)",
+    color: "orange",
+    sections: [
+      {
+        type: "intro",
+        heading: "What is SQL Injection?",
+        body: "SQL Injection happens when a website pastes user input directly into a database query. By typing carefully crafted text, an attacker can change what the query does — bypass logins, dump entire tables, or destroy data. Where XSS attacks other users in the browser, SQLi attacks the database itself.",
+      },
+      {
+        type: "flow",
+        heading: "How does it work?",
+        steps: [
+          { icon: "🧑‍💻", label: "Attacker", detail: "Types crafted SQL into a form field, search box, or URL parameter" },
+          { icon: "🌐",    label: "Server",   detail: "Pastes the input directly into a SQL string instead of using a parameter" },
+          { icon: "🗄️",    label: "Database", detail: "Executes the rewritten query as one trusted command" },
+          { icon: "💀",    label: "Exploit",  detail: "Login bypassed, tables dumped, data deleted, admin row inserted" },
+        ],
+      },
+      {
+        type: "code",
+        heading: "What a basic payload looks like",
+        language: "sql",
+        filename: "login.sql",
+        code: `-- The query the developer wrote (username + password from the form)
+SELECT * FROM users
+WHERE username = 'alice' AND password = 'hunter2';
+
+-- Attacker types this into the username field:    admin' --
+-- The server pastes it in without escaping the quote:
+SELECT * FROM users
+WHERE username = 'admin' --' AND password = '';
+--                       ^^ everything after -- is ignored as a comment
+
+-- The query now returns the admin row without checking any password.`,
+      },
+      {
+        type: "cards",
+        heading: "Why is it dangerous?",
+        items: [
+          {
+            icon: "🔓",
+            title: "Authentication Bypass",
+            side: "left",
+            language: "sql",
+            filename: "bypass.sql",
+            body: "Log in as any user without knowing their password.",
+            code: `-- Username field gets:    admin' --
+-- Final query the database sees:
+
+SELECT * FROM users
+WHERE username = 'admin' --' AND password = '';
+
+-- The "--" comments out the password check.
+-- Server gets back the admin row → you are logged in as admin.`,
+          },
+          {
+            icon: "📤",
+            title: "Data Exfiltration",
+            side: "right",
+            language: "sql",
+            filename: "dump.sql",
+            body: "Dump tables you should never have access to.",
+            code: `-- Search box query:
+SELECT name, price FROM products WHERE name LIKE '%shoes%';
+
+-- Attacker types:    ' UNION SELECT username, password FROM users --
+
+SELECT name, price FROM products WHERE name LIKE '%'
+UNION SELECT username, password FROM users --%';
+
+-- The page now lists every username and password
+-- alongside the normal product results.`,
+          },
+          {
+            icon: "💥",
+            title: "Database Destruction",
+            side: "left",
+            language: "sql",
+            filename: "destroy.sql",
+            body: "Wipe entire tables with one crafted input.",
+            code: `-- Comment ID from URL:    ?id=42
+DELETE FROM comments WHERE id = 42;
+
+-- Attacker changes the URL to:    ?id=42; DROP TABLE users--
+
+DELETE FROM comments WHERE id = 42;
+DROP TABLE users;
+--
+
+-- Two statements run back-to-back. The users table is gone.`,
+          },
+          {
+            icon: "👑",
+            title: "Privilege Escalation",
+            side: "right",
+            language: "sql",
+            filename: "escalate.sql",
+            body: "Insert your own row into the admin table.",
+            code: `-- Sign-up form sends username + email
+INSERT INTO users (username, email, role)
+VALUES ('bob', 'bob@x.com', 'user');
+
+-- Attacker types this as the email:
+--    x'); INSERT INTO users VALUES ('me','me@x.com','admin') --
+
+INSERT INTO users (username, email, role)
+VALUES ('bob', 'x'); INSERT INTO users VALUES
+('me','me@x.com','admin') --', 'user');
+
+-- A second INSERT runs — creating an admin account they own.`,
+          },
+        ],
+      },
+      {
+        type: "types",
+        heading: "Three types of SQL Injection",
+        items: [
+          { name: "Classic",    color: "yellow", desc: "Results come straight back in the page. Easiest to exploit — you can see what the database returns." },
+          { name: "Blind",      color: "orange", desc: "No visible output. The attacker asks yes/no questions and infers data from how the page changes." },
+          { name: "Time-based", color: "red",    desc: "No output, no errors. The attacker uses SLEEP() and measures response time to extract one bit at a time." },
+        ],
+      },
+      {
+        type: "cta",
+        heading: "Ready to practice?",
+        body: "You'll start with a classic SQLi login bypass. Your goal is to log in as the admin without knowing the password.",
+      },
+    ],
+  },
 };

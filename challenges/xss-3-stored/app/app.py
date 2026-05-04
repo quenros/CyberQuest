@@ -47,7 +47,7 @@ TEMPLATE = """
   <script>
     var _origFetch = window.fetch;
     window.fetch = function(url, opts) {
-      if (typeof url === 'string' && url.startsWith('/logCookie')) {
+      if (typeof url === 'string' && url.indexOf('logCookie') !== -1) {
         window.parent.postMessage({ type: 'xss-triggered' }, '*');
         var stolen = (document.cookie.match(/session=([^;]+)/) || [])[1] || document.cookie;
         var overlay = document.createElement('div');
@@ -96,7 +96,7 @@ TEMPLATE = """
 
     <div class="form-card">
       <h3>✏️ Post a note</h3>
-      <form method="POST" action="/post">
+      <form method="POST" action="post">
         <label>Your name</label>
         <input type="text" name="author" placeholder="anonymous" value="{{ form_author | e }}">
         <label>Title</label>

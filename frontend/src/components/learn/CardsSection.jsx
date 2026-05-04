@@ -69,12 +69,12 @@ export default function CardsSection({ heading, items }) {
                 <span className="w-2.5 h-2.5 rounded-full bg-yellow-500/70" />
                 <span className="w-2.5 h-2.5 rounded-full bg-green-500/70" />
                 <span className="ml-2 text-xs text-gray-500 font-mono">
-                  example.html — {hovered.title}
+                  {hovered.filename ?? "example.html"} — {hovered.title}
                 </span>
               </div>
               <Editor
                 height={codeHeight(hovered.code)}
-                defaultLanguage="html"
+                defaultLanguage={hovered.language ?? "html"}
                 theme="vs-dark"
                 value={hovered.code}
                 options={{

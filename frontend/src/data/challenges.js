@@ -673,7 +673,7 @@ export const CHALLENGES = {
                                 // real Set-Cookie header, HTTP /logCookie endpoint for exfiltration)
       summary: "Store a payload that silently exfiltrates the session cookie from every visitor.",
       description:
-        "NoteNest is a public note-sharing app. Every note you post is saved and shown to every visitor — permanently.\n\nAt the top of the page you'll see: session=ADMIN_TOKEN_7f3kq9. That's a cookie — a small piece of data the server stores in your browser to remember who you are. As long as you have it, the server treats you as the admin. If an attacker copies it, they can impersonate you without ever knowing your password.\n\nTo steal it, you'll need to:\n· Read the cookie value using JavaScript\n· Find an endpoint on the page that can receive data\n· Send the cookie to that endpoint silently",
+        "NoteNest is a public note-sharing app. Every note you post is saved and shown to every visitor — permanently.\n\nA cookie is a small piece of data the server stores in your browser to remember who you are. As long as you have it, the server treats you as the admin. If an attacker copies it, they can impersonate you without ever knowing your password.\n\nTo steal it, you'll need to:\n· Read the cookie value using JavaScript\n· Find an endpoint on the page that can receive data\n· Send the cookie to that endpoint silently",
       goal: "Post a note that calls fetch('/<API-endpoint>?<cookie variable name>=' + document.cookie) — exfiltrating the session cookie without the victim noticing",
       injectPath: "/inject?body={payload}",
       hints: [
@@ -757,6 +757,306 @@ export const CHALLENGES = {
           items: [
             { code: "document.cookie", codeCls: "text-yellow-300", desc: "readable by JS because the cookie is not HttpOnly", delay: 3.0 },
             { code: "stored XSS", codeCls: "text-red-400", desc: "unlike reflected XSS, every visitor is compromised — not just the attacker", delay: 3.2 },
+          ],
+        },
+      ],
+    },
+  ],
+
+  sqli: [
+    {
+      id: "sqli-1-login",
+      title: "Challenge 1: The Login Bypass",
+      difficulty: 1,
+      points: 100,
+      targetName: "AdminPortal",
+      editorLanguage: "plaintext",
+      sandboxType: "srcdoc",
+      summary: "Inject SQL into a login form to bypass authentication without a password.",
+      description:
+        "AdminPortal is a corporate login page. Only employees with valid credentials can access the admin dashboard.\n\nThe developer built the login query by pasting the username directly into a SQL string — no parameterization. This is the most common cause of SQL injection.\n\nTo find the vulnerability:\n· Submit any username and look at the Generated Query box below the login form.\n· Notice exactly where your input lands in the SQL. Think about what happens if your input contains a quote character.",
+      goal: "Log in as admin without knowing the password.",
+      hints: [
+        "Look at the Generated Query box as you type. Your input lands directly inside single quotes: WHERE username = '<your input>' AND password = '...'",
+        "A single quote ' in your input closes the string early. Everything after that is treated as SQL code, not as a value.",
+        "The -- sequence is a SQL line comment. Anything after -- on the same line is ignored by the database — including the password check.",
+        "The payload is: admin' -- — the quote closes the username string, and -- comments out the AND password = ... check entirely.",
+      ],
+      solution: {
+        payload: "admin' --",
+        explanation: [
+          "The server built the SQL query by pasting your username directly into a string: WHERE username = 'admin' --' AND password = '...'.",
+          "The single quote you injected closed the username string early. After it, you were writing raw SQL — not a value.",
+          "-- is a SQL line comment. Everything after it was ignored, including AND password = '...'. The password check was never evaluated.",
+          "The query now asked: give me the row where username = 'admin' — no password required. The database complied.",
+        ],
+      },
+      defense: {
+        summary: "The query was built by concatenating user input into a string. Parameterized queries make this injection impossible — the database never interprets input as SQL code.",
+        measures: [
+          {
+            title: "Use parameterized queries (prepared statements)",
+            body: "Instead of db.query(\"WHERE username = '\" + input + \"'\"), write db.query(\"WHERE username = ?\", [input]). The value is sent separately — the database treats it as data, never as SQL.",
+          },
+          {
+            title: "Never concatenate user input into SQL strings",
+            body: "Any time input is joined into a SQL string with + or template literals, the code is vulnerable. Use an ORM (SQLAlchemy, Hibernate, ActiveRecord) or query builder — they parameterize automatically.",
+          },
+          {
+            title: "Apply least privilege to the database user",
+            body: "The app's database user should only have SELECT / INSERT / UPDATE on the tables it needs. Even if injection occurs, the attacker cannot DROP TABLE or read other databases.",
+          },
+        ],
+      },
+      pageTemplate: `<!DOCTYPE html>
+<html>
+<head>
+  <title>CyberQuest :: AdminPortal</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: monospace; background: #0f172a; color: #e2e8f0; margin: 0; min-height: 100vh; display: flex; flex-direction: column; }
+    .topbar { background: #1e293b; border-bottom: 1px solid #334155; padding: 10px 20px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+    .topbar-logo { color: #f59e0b; font-weight: bold; font-size: 14px; }
+    .topbar-sub { color: #64748b; font-size: 11px; }
+    .page { flex: 1; display: flex; align-items: center; justify-content: center; padding: 24px; }
+    .card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 28px 28px 20px; width: 100%; max-width: 380px; }
+    .card-title { font-size: 15px; font-weight: bold; color: #f59e0b; margin: 0 0 4px; }
+    .card-sub { color: #64748b; font-size: 12px; margin: 0 0 18px; }
+    label { display: block; font-size: 11px; color: #94a3b8; margin: 12px 0 4px; }
+    label:first-of-type { margin-top: 0; }
+    input { width: 100%; padding: 8px 10px; background: #0f172a; border: 1px solid #334155; color: #e2e8f0; border-radius: 6px; font-family: monospace; font-size: 13px; }
+    input:focus { outline: none; border-color: #f59e0b; }
+    .login-btn { width: 100%; margin-top: 14px; padding: 9px; background: #d97706; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-family: monospace; font-size: 13px; }
+    .login-btn:hover { background: #b45309; }
+    .err { margin-top: 10px; font-size: 12px; color: #f87171; text-align: center; display: none; }
+    .qs { margin-top: 16px; border-top: 1px solid #334155; padding-top: 14px; }
+    .qs-label { font-size: 10px; color: #475569; letter-spacing: 0.08em; margin-bottom: 6px; }
+    .qs-pre { background: #0f172a; border: 1px solid #1e3a5f; border-radius: 6px; padding: 10px 12px; font-size: 11px; line-height: 1.7; white-space: pre-wrap; overflow-x: auto; margin: 0; }
+    .qt-normal { color: #7dd3fc; }
+    .qt-inject { color: #f97316; font-weight: bold; }
+    .back-btn { background: none; border: 1px solid #334155; color: #94a3b8; font-family: monospace; font-size: 12px; padding: 6px 12px; border-radius: 6px; cursor: pointer; margin-top: 14px; }
+    .back-btn:hover { border-color: #f59e0b; color: #f59e0b; }
+    /* user panel */
+    .up { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 24px; width: 100%; max-width: 380px; }
+    .up-title { font-size: 14px; font-weight: bold; color: #e2e8f0; margin: 0 0 6px; }
+    .up-note { font-size: 12px; color: #94a3b8; margin: 0; }
+  </style>
+  <script>
+    var USERS = [
+      { username: 'admin', password: 'c0rp$3cret!9', role: 'admin' },
+      { username: 'alice', password: 'al1ce99pass',  role: 'user'  },
+    ];
+
+    function simulateLogin(username, password) {
+      // Vulnerable query — string concatenation, exactly like the server does
+      var raw = "SELECT * FROM users WHERE username = '" + username + "' AND password = '" + password + "'";
+      // Strip SQL line comments (-- to end of line)
+      var stripped = raw.replace(/--[^\\r\\n]*/g, '');
+      // Extract WHERE clause
+      var m = stripped.match(/WHERE\\s+([\\s\\S]+)$/i);
+      if (!m || !m[1].trim()) return null;
+      var where = m[1].trim();
+      // Try each user row
+      for (var i = 0; i < USERS.length; i++) {
+        try {
+          var row = USERS[i];
+          // Transform SQL WHERE tokens into a JS boolean expression
+          var expr = where
+            .replace(/\\bOR\\b/gi, '||')
+            .replace(/\\bAND\\b/gi, '&&')
+            // 'literal' = 'literal'  (both sides quoted)
+            .replace(/'([^']*)'\\s*=\\s*'([^']*)'/g, function(_, a, b) {
+              return JSON.stringify(a) + '===' + JSON.stringify(b);
+            })
+            // column = 'value'
+            .replace(/\\b(\\w+)\\s*=\\s*'([^']*)'/g, function(_, col, val) {
+              return JSON.stringify(String(row[col] != null ? row[col] : '')) + '===' + JSON.stringify(val);
+            })
+            // number = number
+            .replace(/\\b(\\d+)\\s*=\\s*(\\d+)\\b/g, function(_, a, b) { return a + '===' + b; });
+          if ((new Function('return (' + expr + ')'))()) return row;
+        } catch(e) {}
+      }
+      return null;
+    }
+
+    function updateQuery() {
+      var u = document.getElementById('uname').value;
+      var p = document.getElementById('pwd').value || '...';
+      var pre = document.getElementById('qpre');
+      pre.textContent = '';
+      var parts = [
+        { text: "SELECT * FROM users\\nWHERE username = '", cls: 'qt-normal' },
+        { text: u,                                          cls: 'qt-inject' },
+        { text: "'\\n  AND password = '",                  cls: 'qt-normal' },
+        { text: p,                                          cls: 'qt-normal' },
+        { text: "'",                                        cls: 'qt-normal' },
+      ];
+      parts.forEach(function(p) {
+        var s = document.createElement('span');
+        s.className = p.cls;
+        s.textContent = p.text;
+        pre.appendChild(s);
+      });
+    }
+
+    function login() {
+      var u = document.getElementById('uname').value;
+      var p = document.getElementById('pwd').value;
+      var matched = simulateLogin(u, p);
+      document.getElementById('err').style.display = 'none';
+      if (matched && matched.role === 'admin') {
+        window.parent.postMessage({ type: 'xss-triggered' }, '*');
+        document.getElementById('sec-login').style.display = 'none';
+        buildAdminPanel();
+        document.getElementById('sec-admin').style.display = 'flex';
+      } else if (matched) {
+        document.getElementById('sec-login').style.display = 'none';
+        document.getElementById('sec-user').style.display = 'flex';
+      } else {
+        document.getElementById('err').style.display = 'block';
+      }
+    }
+
+    function backToLogin() {
+      document.getElementById('sec-admin').style.display = 'none';
+      document.getElementById('sec-user').style.display = 'none';
+      document.getElementById('sec-login').style.display = 'flex';
+    }
+
+    function buildAdminPanel() {
+      var wrap = document.getElementById('sec-admin');
+      if (wrap.childElementCount) return; // already built
+      var banner = document.createElement('div');
+      banner.style.cssText = 'position:fixed;top:0;left:0;width:100%;background:#22c55e;color:#000;text-align:center;padding:12px;font-weight:bold;font-size:15px;font-family:monospace;z-index:9999';
+      banner.textContent = 'SQLi Triggered! Logged in as admin — no password needed.';
+      document.body.prepend(banner);
+
+      var panel = document.createElement('div');
+      panel.style.cssText = 'background:#1e293b;border:1px solid #334155;border-radius:12px;padding:24px;width:100%;max-width:460px';
+
+      var badge = document.createElement('div');
+      badge.style.cssText = 'display:inline-flex;align-items:center;gap:6px;background:#052e16;border:1px solid #16a34a;color:#4ade80;border-radius:20px;padding:4px 12px;font-size:11px;font-weight:bold;margin-bottom:14px';
+      badge.textContent = '✓ Authenticated as admin';
+
+      var title = document.createElement('p');
+      title.style.cssText = 'font-size:15px;font-weight:bold;color:#f59e0b;margin:0 0 4px';
+      title.textContent = 'Admin Dashboard';
+
+      var sub = document.createElement('p');
+      sub.style.cssText = 'font-size:12px;color:#64748b;margin:0 0 16px';
+      sub.textContent = 'Full access. This is what the attacker now sees.';
+
+      var box = document.createElement('div');
+      box.style.cssText = 'background:#0f172a;border:1px solid #7c3aed;border-radius:8px;padding:12px 14px';
+
+      var boxLabel = document.createElement('p');
+      boxLabel.style.cssText = 'font-size:10px;color:#7c3aed;letter-spacing:0.1em;margin:0 0 10px';
+      boxLabel.textContent = 'SENSITIVE CONFIGURATION';
+
+      var rows = [
+        ['DB_HOST',       'db.internal.corp'       ],
+        ['DB_PASSWORD',   'Sup3r$3cret_2024!'      ],
+        ['STRIPE_SECRET', 'sk_live_4Kq9...redacted'],
+        ['ADMIN_COUNT',   '14 accounts found'      ],
+      ];
+      box.appendChild(boxLabel);
+      rows.forEach(function(r) {
+        var row = document.createElement('div');
+        row.style.cssText = 'display:flex;justify-content:space-between;font-size:11px;padding:4px 0;border-bottom:1px solid #1e293b';
+        var k = document.createElement('span'); k.style.color = '#64748b'; k.textContent = r[0];
+        var v = document.createElement('span'); v.style.color = '#a78bfa'; v.textContent = r[1];
+        row.appendChild(k); row.appendChild(v); box.appendChild(row);
+      });
+
+      var btn = document.createElement('button');
+      btn.className = 'back-btn';
+      btn.onclick = backToLogin;
+      btn.textContent = '← Try another payload';
+
+      panel.appendChild(badge); panel.appendChild(title); panel.appendChild(sub);
+      panel.appendChild(box);   panel.appendChild(btn);
+      wrap.appendChild(panel);
+    }
+
+    window.addEventListener('DOMContentLoaded', function() { updateQuery(); });
+  </script>
+</head>
+<body>
+  <div class="topbar">
+    <span class="topbar-logo">🏢 AdminPortal</span>
+    <span class="topbar-sub">Internal access only</span>
+  </div>
+
+  <div class="page">
+    <!-- Login form -->
+    <div id="sec-login" style="width:100%;max-width:380px;display:flex;justify-content:center">
+      <div class="card">
+        <p class="card-title">Employee Login</p>
+        <p class="card-sub">Enter your credentials to continue.</p>
+        <label>Username</label>
+        <!-- auth query: db.query("SELECT * FROM users WHERE username = '" + req.body.username + "' AND password = '" + req.body.password + "'") -->
+        <input id="uname" type="text" value="{payload_escaped}" oninput="updateQuery()" autocomplete="off" spellcheck="false">
+        <label>Password</label>
+        <input id="pwd" type="text" placeholder="password" oninput="updateQuery()" autocomplete="off">
+        <button class="login-btn" onclick="login()">Login →</button>
+        <p id="err" class="err">✗ Invalid username or password.</p>
+        <div class="qs">
+          <p class="qs-label">GENERATED SQL QUERY</p>
+          <pre id="qpre" class="qs-pre"></pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- Admin panel (built by JS on success) -->
+    <div id="sec-admin" style="width:100%;max-width:460px;justify-content:center;display:none"></div>
+
+    <!-- Regular user panel -->
+    <div id="sec-user" style="justify-content:center;display:none">
+      <div class="up">
+        <p class="up-title">Welcome back, alice.</p>
+        <p class="up-note">Logged in as a regular user. Admin access is restricted.</p>
+        <button class="back-btn" onclick="backToLogin()">← Back to login</button>
+      </div>
+    </div>
+  </div>
+</body>
+</html>`,
+      animation: [
+        {
+          type: "block",
+          label: "vulnerable query template",
+          accent: "gray",
+          delay: 0,
+          segments: [
+            { text: "WHERE username = '", cls: "text-gray-400" },
+            { text: "\" + username + \"", cls: "text-yellow-400 bg-yellow-400/10 rounded px-1 mx-0.5" },
+            { text: "' AND password = '...'", cls: "text-gray-400" },
+            { text: "↑ username pasted directly into SQL string — no parameterization", cls: "block text-xs text-yellow-600 mt-1 pl-1", delay: 0.4 },
+          ],
+        },
+        { type: "arrow", delay: 0.7, label: "payload: admin' --" },
+        {
+          type: "block",
+          label: "resulting SQL the database sees",
+          accent: "red",
+          delay: 0.9,
+          segments: [
+            { text: "WHERE username = '", cls: "text-gray-400" },
+            { text: "admin", cls: "text-orange-300 font-bold", delay: 1.1 },
+            { text: "'", cls: "text-orange-400 font-bold", delay: 1.3 },
+            { text: " --", cls: "text-gray-600 font-bold", delay: 1.5 },
+            { text: "' AND password = '...'", cls: "text-gray-700 line-through", delay: 1.5 },
+            { text: "↑ quote closed the string — everything after -- is a comment", cls: "block text-xs text-red-500 mt-1 pl-1", delay: 1.7 },
+          ],
+        },
+        {
+          type: "legend",
+          delay: 2.0,
+          items: [
+            { code: "'",        codeCls: "text-orange-400", desc: "closes the username string — you are now writing raw SQL", delay: 2.0 },
+            { code: "--",       codeCls: "text-gray-500",   desc: "SQL line comment — everything after this is ignored", delay: 2.2 },
+            { code: "AND password = '...'", codeCls: "text-gray-600", desc: "commented out — the password check never runs", delay: 2.4 },
           ],
         },
       ],
