@@ -22,13 +22,20 @@ function renderSection(section, i) {
 }
 
 export default function LearnPage({ alias }) {
-  const { topicId } = useParams();
+  const { topicId, lectureId } = useParams();
   const navigate = useNavigate();
-  const content = LEARN_CONTENT[topicId];
-  if (!content) return <div className="p-8 text-gray-400">Topic not found.</div>;
 
-  const c = COLOR_MAP[content.color];
+  const topicContent = LEARN_CONTENT[topicId];
+  if (!topicContent) return <div className="p-8 text-gray-400">Topic not found.</div>;
+
+  const content = lectureId
+    ? topicContent.bridgeLectures?.[lectureId]
+    : topicContent;
+  if (!content) return <div className="p-8 text-gray-400">Lecture not found.</div>;
+
+  const c = COLOR_MAP[topicContent.color];
   const cta = content.sections.find((s) => s.type === "cta");
+  const isBridge = !!lectureId;
 
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100">
@@ -45,7 +52,7 @@ export default function LearnPage({ alias }) {
         </span>
       </header>
 
-      <main className="max-w-3xl mx-auto px-6 py-12 flex flex-col gap-6">
+      <main className="max-w-5xl mx-auto px-6 py-12 flex flex-col gap-6">
         {/* Page title */}
         <motion.div
           initial={{ opacity: 0, y: 16 }}
@@ -53,10 +60,12 @@ export default function LearnPage({ alias }) {
           transition={{ duration: 0.4 }}
         >
           <span className={`text-xs font-semibold px-2 py-1 rounded-full ${c.badge}`}>
-            LESSON
+            {isBridge ? "TECHNIQUE" : "LESSON"}
           </span>
           <h1 className="text-4xl font-bold mt-3 mb-1">{content.title}</h1>
-          <p className="text-gray-400">Read through, then put it into practice.</p>
+          <p className="text-gray-400">
+            {isBridge ? "Read through before tackling the next challenge." : "Read through, then put it into practice."}
+          </p>
         </motion.div>
 
         {/* Sections */}
@@ -74,10 +83,10 @@ export default function LearnPage({ alias }) {
             <h2 className="text-2xl font-bold mb-2">{cta.heading}</h2>
             <p className="text-gray-400 mb-6">{cta.body}</p>
             <button
-              onClick={() => navigate(`/challenges/${topicId}/0`)}
+              onClick={() => navigate(`/challenges/${topicId}/${cta.challengeIndex ?? 0}`)}
               className={`px-8 py-3 rounded-xl font-bold text-gray-950 transition-colors ${c.btn}`}
             >
-              Start Challenges →
+              {cta.buttonLabel ?? "Start Challenges →"}
             </button>
           </motion.div>
         )}

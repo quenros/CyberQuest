@@ -805,6 +805,10 @@ return-link.addEventListener('click', function(e) {
       targetName: "AdminPortal",
       editorLanguage: "plaintext",
       sandboxType: "sql",
+      editorLabel: "SQL Terminal",
+      editorAction: "Run Query",
+      editorPlaceholder: "SHOW TABLES",
+      editorHint: "Use this terminal to run any SQL query and explore the database — try SHOW TABLES or SELECT * FROM tablename. Results appear in the SQL Terminal panel inside the portal. To solve the challenge, type your injection payload directly into the Username field in the login form and click Login.",
       summary: "Inject SQL into a login form to bypass authentication without a password.",
       description:
         "AdminPortal is a corporate login page. Only employees with valid credentials can access the admin dashboard.\n\nThe developer built the login query by pasting the username directly into a SQL string — no parameterization. This is the most common cause of SQL injection.\n\nTo find the vulnerability:\n· Submit any username and look at the Generated Query box below the login form.\n· Notice exactly where your input lands in the SQL. Think about what happens if your input contains a quote character.",
@@ -909,15 +913,19 @@ return-link.addEventListener('click', function(e) {
       targetName: "ShopDB",
       editorLanguage: "plaintext",
       sandboxType: "sql",
+      editorLabel: "SQL Terminal",
+      editorAction: "Run Query",
+      editorPlaceholder: "SHOW TABLES",
+      editorHint: "Use this terminal to run any SQL query and explore the database — try SHOW TABLES or SELECT * FROM tablename. Results appear in the SQL Terminal panel inside the portal. To solve the challenge, type your injection payload directly into the Product Search bar in the portal and click Search.",
       summary: "Use a UNION injection to extract credentials from a table the application never intended to expose.",
       description:
-        "ShopDB is an internal product catalogue used by warehouse staff. The search field passes your input directly into a SQL LIKE query — no parameterization.\n\nThe query returns three columns: id, name, and price. SQL's UNION operator lets you attach a second SELECT to that same result set — but only if your injected SELECT also returns exactly three columns.\n\nTo find the vulnerability:\n· Submit any search term and observe the Generated Query box.\n· A single quote breaks out of the LIKE string and lets you write raw SQL.\n· Figure out how many columns the query returns, then inject a UNION SELECT that reads from a different table.",
+        "ShopDB is an internal product catalogue used by warehouse staff. The search field passes your input directly into a SQL LIKE query — no parameterization.\n\nThe query returns three columns: id, name, and price. SQL's UNION operator lets you attach a second SELECT to that same result set — but only if your injected SELECT also returns exactly three columns.\n\nTo find the vulnerability:\n· Use the SQL Terminal on the left to explore the database schema.\n· Submit any search term in the portal and observe the Generated Query box.\n· A single quote breaks out of the LIKE string and lets you write raw SQL.\n· Figure out how many columns the query returns, then inject a UNION SELECT that reads from a table you discovered.",
       goal: "Dump the users table — make admin's credentials appear in the search results.",
       hints: [
-        "Type a single quote ' in the search box and click Search. The Generated Query shows your quote breaking out of the LIKE string — everything after it is now raw SQL.",
-        "A UNION SELECT must return the same number of columns as the original query. Probe the count: try ' ORDER BY 3 -- (works) vs ' ORDER BY 4 -- (error). The query has exactly 3 columns.",
-        "Confirm the count: ' UNION SELECT 1,2,3 -- should append a row with literal values 1, 2, 3 to the results. A wrong count gives a column-mismatch error instead.",
-        "The users table has columns: id, username, password. Replace the filler values: ' UNION SELECT 1, username, password FROM users --",
+        "Start with recon. Run SHOW TABLES in the SQL Terminal on the left — it lists every table in the database. Look at what else exists beyond the products table.",
+        "Now figure out the columns. Run SELECT * FROM <tablename> LIMIT 1 in the terminal to see the column names of any table you found.",
+        "Type a single quote ' in the search box and click Search. The Generated Query shows it breaking out of the LIKE string. A UNION SELECT must return the same number of columns as the original query — probe the count: try ' ORDER BY 3 -- (works) vs ' ORDER BY 4 -- (error).",
+        "You now know the table name, its columns, and the column count. Build your UNION: ' UNION SELECT col1, col2, col3 FROM <table> -- — replace each col with the column names you discovered.",
       ],
       solution: {
         payload: "' UNION SELECT 1, username, password FROM users --",
@@ -968,6 +976,7 @@ return-link.addEventListener('click', function(e) {
         columnHeaders: ['ID', 'NAME', 'PRICE'],
         winCondition: "rows.some(function(r) { return Object.values(r).some(function(v) { return String(v).toLowerCase() === 'admin'; }); })",
         winMessage: 'SQLi Triggered! Users table dumped — admin credentials exposed.',
+        pageComment: 'TODO: decommission legacy users table after v3 auth migration (#341)',
       },
       animation: [
         {
@@ -1019,6 +1028,10 @@ return-link.addEventListener('click', function(e) {
       targetName: "StaffDB",
       editorLanguage: "plaintext",
       sandboxType: "sql",
+      editorLabel: "SQL Terminal",
+      editorAction: "Run Query",
+      editorPlaceholder: "SHOW TABLES",
+      editorHint: "Use this terminal to run any SQL query and explore the database — try SHOW TABLES or SELECT * FROM tablename. Results appear in the SQL Terminal panel inside the portal. To solve the challenge, type your injection payload directly into the Department search bar in the portal and click Search.",
       summary: "Chain a second SQL statement using a semicolon to wipe an entire table the app never meant to modify.",
       description:
         "StaffDB is an internal HR portal. Warehouse staff use it to look up colleagues by department.\n\nThe department filter is built by pasting user input directly into a SQL WHERE clause — no parameterization. This is the same root cause as Challenge 1, but this time the goal isn't authentication bypass.\n\nSQL supports multiple statements separated by a semicolon (;). Most database drivers execute each statement in sequence. If you can escape the current string and append a semicolon, you can inject a completely independent second statement — one the application never called.\n\nTo explore the vulnerability:\n· Type a department name like Engineering and observe the Generated Query.\n· Try breaking out of the string with a single quote. What does the query look like?\n· Think about what comes after the semicolon.",

@@ -57,6 +57,18 @@ const SHARED_CSS = `
   .err-box { margin-top: 10px; font-size: 12px; color: #f87171;
              background: rgba(248,113,113,.08); border: 1px solid rgba(248,113,113,.3);
              border-radius: 6px; padding: 8px 12px; display: none; }
+  /* SQL terminal (recon console) */
+  .con { margin-top: 16px; border-top: 1px solid #1e293b; padding-top: 14px; }
+  .con-lbl { font-size: 10px; color: #334155; letter-spacing: .1em; margin-bottom: 6px; }
+  .con-out { background: #020c1b; border: 1px solid #0f2233; border-radius: 6px;
+             padding: 10px 12px; min-height: 48px; max-height: 160px; overflow-y: auto; font-size: 11px; }
+  .con-ph  { color: #1e3a5f; font-style: italic; }
+  .con-err { color: #f87171; }
+  .con-ok  { color: #64748b; font-style: italic; }
+  .con-out table { width: 100%; border-collapse: collapse; }
+  .con-out th { text-align: left; padding: 2px 6px; color: #334155; font-size: 10px;
+                letter-spacing: .06em; border-bottom: 1px solid #0f2233; }
+  .con-out td { padding: 3px 6px; color: #7dd3fc; border-bottom: 1px solid #020c1b; }
 `;
 
 // Shared runtime helpers embedded verbatim inside each page's <script>.
@@ -82,6 +94,59 @@ const SHARED_JS = `
   function checkWin(cond, rows) {
     try { return (new Function('rows', 'return (' + cond + ')'))(rows); }
     catch(e) { return false; }
+  }
+
+  function runConsole(sql) {
+    var out = document.getElementById('con-out');
+    if (!out) return;
+    out.innerHTML = '';
+    if (!sql || !sql.trim()) {
+      out.innerHTML = '<span class="con-ph">Run a query from the editor to explore the database.</span>';
+      return;
+    }
+    var res, err;
+    try { res = alasql(sql.trim()); err = null; }
+    catch(e) { res = null; err = e.message; }
+    if (err) {
+      var ed = document.createElement('div'); ed.className = 'con-err';
+      ed.textContent = err; out.appendChild(ed); return;
+    }
+    // Normalise to array of row-objects
+    var rows;
+    if (Array.isArray(res) && res.length > 0 && Array.isArray(res[0])) {
+      rows = res[0];
+    } else if (Array.isArray(res)) {
+      rows = res;
+    } else if (typeof res === 'number') {
+      var inf = document.createElement('div'); inf.className = 'con-ok';
+      inf.textContent = res + ' row' + (res !== 1 ? 's' : '') + ' affected';
+      out.appendChild(inf); return;
+    } else { rows = []; }
+    if (!rows.length) {
+      var emp = document.createElement('div'); emp.className = 'con-ok';
+      emp.textContent = '(no rows)'; out.appendChild(emp); return;
+    }
+    if (typeof rows[0] !== 'object' || rows[0] === null) {
+      var prim = document.createElement('div'); prim.className = 'con-ok';
+      prim.textContent = rows.join(', '); out.appendChild(prim); return;
+    }
+    var keys = Object.keys(rows[0]);
+    var tbl = document.createElement('table');
+    var htr = document.createElement('tr');
+    keys.forEach(function(k) {
+      var th = document.createElement('th'); th.textContent = k; htr.appendChild(th);
+    });
+    tbl.appendChild(htr);
+    rows.forEach(function(r) {
+      var tr = document.createElement('tr');
+      keys.forEach(function(k) {
+        var td = document.createElement('td');
+        td.textContent = r[k] !== undefined ? String(r[k]) : '';
+        tr.appendChild(td);
+      });
+      tbl.appendChild(tr);
+    });
+    out.appendChild(tbl);
   }
 
   function renderQuery(preId, tmpl, input) {
@@ -227,11 +292,8 @@ function buildUserPanel(row) {
 }
 
 window.addEventListener('message', function(e) {
-  if (e.data && e.data.type === 'run') {
-    var p = e.data.payload || '';
-    document.getElementById('uname').value = p;
-    doLogin(p);
-  }
+  if (!e.data) return;
+  if (e.data.type === 'sql') { runConsole(e.data.query || ''); return; }
 });
 
 window.addEventListener('DOMContentLoaded', function() {
@@ -261,6 +323,10 @@ window.addEventListener('DOMContentLoaded', function() {
       <div class="qs">
         <p class="qs-lbl">GENERATED SQL QUERY</p>
         <pre id="qpre" class="qs-pre"></pre>
+      </div>
+      <div class="con">
+        <p class="con-lbl">SQL TERMINAL &middot; RECON</p>
+        <div id="con-out" class="con-out"><span class="con-ph">Run a query from the editor to explore the database.</span></div>
       </div>
     </div>
   </div>
@@ -351,7 +417,8 @@ function doSearch(input) {
 }
 
 window.addEventListener('message', function(e) {
-  if (e.data && e.data.type === 'run') doSearch(e.data.payload || '');
+  if (!e.data) return;
+  if (e.data.type === 'sql') { runConsole(e.data.query || ''); return; }
 });
 
 window.addEventListener('DOMContentLoaded', function() {
@@ -391,8 +458,13 @@ window.addEventListener('DOMContentLoaded', function() {
       <p class="qs-lbl">GENERATED SQL QUERY</p>
       <pre id="qpre" class="qs-pre"></pre>
     </div>
+    <div class="con">
+      <p class="con-lbl">SQL TERMINAL &middot; RECON</p>
+      <div id="con-out" class="con-out"><span class="con-ph">Run a query from the editor to explore the database.</span></div>
+    </div>
   </div>
 </div>
+${s.pageComment ? `<!-- ${s.pageComment} -->` : ''}
 </body>
 </html>`;
 }
@@ -504,7 +576,8 @@ function resetDb() {
 }
 
 window.addEventListener('message', function(e) {
-  if (e.data && e.data.type === 'run') doSearch(e.data.payload || '');
+  if (!e.data) return;
+  if (e.data.type === 'sql') { runConsole(e.data.query || ''); return; }
 });
 
 window.addEventListener('DOMContentLoaded', function() {
@@ -548,6 +621,10 @@ window.addEventListener('DOMContentLoaded', function() {
     <div class="qs">
       <p class="qs-lbl">GENERATED SQL QUERY</p>
       <pre id="qpre" class="qs-pre"></pre>
+    </div>
+    <div class="con">
+      <p class="con-lbl">SQL TERMINAL &middot; RECON</p>
+      <div id="con-out" class="con-out"><span class="con-ph">Run a query from the editor to explore the database.</span></div>
     </div>
   </div>
 </div>

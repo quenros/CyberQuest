@@ -4,6 +4,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import Editor from "@monaco-editor/react";
 import api from "../api/client";
 import { CHALLENGES } from "../data/challenges";
+import { TOPICS } from "../data/topics";
 import SolutionAnimation from "../components/SolutionAnimation";
 import { buildSqlPage } from "../utils/sqlSandbox";
 
@@ -351,7 +352,7 @@ export default function ChallengePage({ alias }) {
 
     if (isSql) {
       // Send payload to the already-running iframe — no reload needed.
-      iframeRef.current?.contentWindow?.postMessage({ type: "run", payload: trimmed }, "*");
+      iframeRef.current?.contentWindow?.postMessage({ type: "sql", query: trimmed }, "*");
     } else if (isSrcdoc) {
       setSrcdoc(substituteTemplate(challenge.pageTemplate, trimmed));
     } else if (sandboxPort && iframeRef.current) {
@@ -385,8 +386,12 @@ export default function ChallengePage({ alias }) {
   }
 
   function goNextChallenge() {
-    const dest = hasNext ? `/challenges/${topicId}/${challengeIndex + 1}` : "/";
-    doNavigate(dest);
+    if (!hasNext) { doNavigate("/"); return; }
+    const topic = TOPICS.find((t) => t.id === topicId);
+    const bridge = (topic?.bridgeLectures ?? []).find(
+      (b) => b.beforeIndex === challengeIndex + 1
+    );
+    doNavigate(bridge ? `/learn/${topicId}/${bridge.id}` : `/challenges/${topicId}/${challengeIndex + 1}`);
   }
 
   // ── Guard ─────────────────────────────────────────────────────────────────

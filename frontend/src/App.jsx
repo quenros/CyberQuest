@@ -25,6 +25,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Dashboard alias={alias} />} />
           <Route path="/learn/:topicId" element={<LearnPage alias={alias} />} />
+          <Route path="/learn/:topicId/:lectureId" element={<LearnPage alias={alias} />} />
           <Route path="/challenges/:topicId/:index" element={<ChallengeRoute alias={alias} />} />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>

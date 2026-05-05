@@ -16,6 +16,15 @@ function buildCurriculum() {
       }
 
       (CHALLENGES[topic.id] ?? []).forEach((challenge, i) => {
+        const bridge = (topic.bridgeLectures ?? []).find((b) => b.beforeIndex === i);
+        if (bridge) {
+          items.push({
+            type: "lecture",
+            title: bridge.title,
+            description: bridge.description,
+            route: `/learn/${topic.id}/${bridge.id}`,
+          });
+        }
         items.push({
           type: "challenge",
           title: challenge.title,

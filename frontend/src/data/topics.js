@@ -26,6 +26,20 @@ export const TOPICS = [
       title: "Introduction to SQL Injection",
       description: "Learn how attackers manipulate database queries through unsanitized input.",
     },
+    bridgeLectures: [
+      {
+        beforeIndex: 1,
+        id: "union-recon",
+        title: "UNION Injection & Schema Discovery",
+        description: "Learn to enumerate tables and columns, count query columns, and chain a UNION SELECT to read data the app never meant to expose.",
+      },
+      {
+        beforeIndex: 2,
+        id: "stacked-queries",
+        title: "Stacked Queries",
+        description: "Learn to terminate the current statement with a semicolon and execute an independent second command — DELETE, INSERT, UPDATE, or DROP.",
+      },
+    ],
   },
   {
     id: "csrf",
