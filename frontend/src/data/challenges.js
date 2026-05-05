@@ -804,7 +804,7 @@ return-link.addEventListener('click', function(e) {
       points: 100,
       targetName: "AdminPortal",
       editorLanguage: "plaintext",
-      sandboxType: "srcdoc",
+      sandboxType: "sql",
       summary: "Inject SQL into a login form to bypass authentication without a password.",
       description:
         "AdminPortal is a corporate login page. Only employees with valid credentials can access the admin dashboard.\n\nThe developer built the login query by pasting the username directly into a SQL string — no parameterization. This is the most common cause of SQL injection.\n\nTo find the vulnerability:\n· Submit any username and look at the Generated Query box below the login form.\n· Notice exactly where your input lands in the SQL. Think about what happens if your input contains a quote character.",
@@ -841,220 +841,27 @@ return-link.addEventListener('click', function(e) {
           },
         ],
       },
-      pageTemplate: `<!DOCTYPE html>
-<html>
-<head>
-  <title>CyberQuest :: AdminPortal</title>
-  <style>
-    * { box-sizing: border-box; }
-    body { font-family: monospace; background: #0f172a; color: #e2e8f0; margin: 0; min-height: 100vh; display: flex; flex-direction: column; }
-    .topbar { background: #1e293b; border-bottom: 1px solid #334155; padding: 10px 20px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
-    .topbar-logo { color: #f59e0b; font-weight: bold; font-size: 14px; }
-    .topbar-sub { color: #64748b; font-size: 11px; }
-    .page { flex: 1; display: flex; align-items: center; justify-content: center; padding: 24px; }
-    .card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 28px 28px 20px; width: 100%; max-width: 380px; }
-    .card-title { font-size: 15px; font-weight: bold; color: #f59e0b; margin: 0 0 4px; }
-    .card-sub { color: #64748b; font-size: 12px; margin: 0 0 18px; }
-    label { display: block; font-size: 11px; color: #94a3b8; margin: 12px 0 4px; }
-    label:first-of-type { margin-top: 0; }
-    input { width: 100%; padding: 8px 10px; background: #0f172a; border: 1px solid #334155; color: #e2e8f0; border-radius: 6px; font-family: monospace; font-size: 13px; }
-    input:focus { outline: none; border-color: #f59e0b; }
-    .login-btn { width: 100%; margin-top: 14px; padding: 9px; background: #d97706; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-family: monospace; font-size: 13px; }
-    .login-btn:hover { background: #b45309; }
-    .err { margin-top: 10px; font-size: 12px; color: #f87171; text-align: center; display: none; }
-    .qs { margin-top: 16px; border-top: 1px solid #334155; padding-top: 14px; }
-    .qs-label { font-size: 10px; color: #475569; letter-spacing: 0.08em; margin-bottom: 6px; }
-    .qs-pre { background: #0f172a; border: 1px solid #1e3a5f; border-radius: 6px; padding: 10px 12px; font-size: 11px; line-height: 1.7; white-space: pre-wrap; overflow-x: auto; margin: 0; }
-    .qt-normal { color: #7dd3fc; }
-    .qt-inject { color: #f97316; font-weight: bold; }
-    .back-btn { background: none; border: 1px solid #334155; color: #94a3b8; font-family: monospace; font-size: 12px; padding: 6px 12px; border-radius: 6px; cursor: pointer; margin-top: 14px; }
-    .back-btn:hover { border-color: #f59e0b; color: #f59e0b; }
-    /* user panel */
-    .up { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 24px; width: 100%; max-width: 380px; }
-    .up-title { font-size: 14px; font-weight: bold; color: #e2e8f0; margin: 0 0 6px; }
-    .up-note { font-size: 12px; color: #94a3b8; margin: 0; }
-  </style>
-  <script>
-    var USERS = [
-      { username: 'admin', password: 'c0rp$3cret!9', role: 'admin' },
-      { username: 'alice', password: 'al1ce99pass',  role: 'user'  },
-    ];
-
-    function simulateLogin(username, password) {
-      // Vulnerable query — string concatenation, exactly like the server does
-      var raw = "SELECT * FROM users WHERE username = '" + username + "' AND password = '" + password + "'";
-      // Strip SQL line comments (-- to end of line)
-      var stripped = raw.replace(/--[^\\r\\n]*/g, '');
-      // Extract WHERE clause
-      var m = stripped.match(/WHERE\\s+([\\s\\S]+)$/i);
-      if (!m || !m[1].trim()) return null;
-      var where = m[1].trim();
-      // Try each user row
-      for (var i = 0; i < USERS.length; i++) {
-        try {
-          var row = USERS[i];
-          // Transform SQL WHERE tokens into a JS boolean expression
-          var expr = where
-            .replace(/\\bOR\\b/gi, '||')
-            .replace(/\\bAND\\b/gi, '&&')
-            // 'literal' = 'literal'  (both sides quoted)
-            .replace(/'([^']*)'\\s*=\\s*'([^']*)'/g, function(_, a, b) {
-              return JSON.stringify(a) + '===' + JSON.stringify(b);
-            })
-            // column = 'value'
-            .replace(/\\b(\\w+)\\s*=\\s*'([^']*)'/g, function(_, col, val) {
-              return JSON.stringify(String(row[col] != null ? row[col] : '')) + '===' + JSON.stringify(val);
-            })
-            // number = number
-            .replace(/\\b(\\d+)\\s*=\\s*(\\d+)\\b/g, function(_, a, b) { return a + '===' + b; });
-          if ((new Function('return (' + expr + ')'))()) return row;
-        } catch(e) {}
-      }
-      return null;
-    }
-
-    function updateQuery() {
-      var u = document.getElementById('uname').value;
-      var p = document.getElementById('pwd').value || '...';
-      var pre = document.getElementById('qpre');
-      pre.textContent = '';
-      var parts = [
-        { text: "SELECT * FROM users\\nWHERE username = '", cls: 'qt-normal' },
-        { text: u,                                          cls: 'qt-inject' },
-        { text: "'\\n  AND password = '",                  cls: 'qt-normal' },
-        { text: p,                                          cls: 'qt-normal' },
-        { text: "'",                                        cls: 'qt-normal' },
-      ];
-      parts.forEach(function(p) {
-        var s = document.createElement('span');
-        s.className = p.cls;
-        s.textContent = p.text;
-        pre.appendChild(s);
-      });
-    }
-
-    function login() {
-      var u = document.getElementById('uname').value;
-      var p = document.getElementById('pwd').value;
-      var matched = simulateLogin(u, p);
-      document.getElementById('err').style.display = 'none';
-      if (matched && matched.role === 'admin') {
-        window.parent.postMessage({ type: 'xss-triggered' }, '*');
-        document.getElementById('sec-login').style.display = 'none';
-        buildAdminPanel();
-        document.getElementById('sec-admin').style.display = 'flex';
-      } else if (matched) {
-        document.getElementById('sec-login').style.display = 'none';
-        document.getElementById('sec-user').style.display = 'flex';
-      } else {
-        document.getElementById('err').style.display = 'block';
-      }
-    }
-
-    function backToLogin() {
-      document.getElementById('sec-admin').style.display = 'none';
-      document.getElementById('sec-user').style.display = 'none';
-      document.getElementById('sec-login').style.display = 'flex';
-    }
-
-    function buildAdminPanel() {
-      var wrap = document.getElementById('sec-admin');
-      if (wrap.childElementCount) return; // already built
-      var banner = document.createElement('div');
-      banner.style.cssText = 'position:fixed;top:0;left:0;width:100%;background:#22c55e;color:#000;text-align:center;padding:12px;font-weight:bold;font-size:15px;font-family:monospace;z-index:9999';
-      banner.textContent = 'SQLi Triggered! Logged in as admin — no password needed.';
-      document.body.prepend(banner);
-
-      var panel = document.createElement('div');
-      panel.style.cssText = 'background:#1e293b;border:1px solid #334155;border-radius:12px;padding:24px;width:100%;max-width:460px';
-
-      var badge = document.createElement('div');
-      badge.style.cssText = 'display:inline-flex;align-items:center;gap:6px;background:#052e16;border:1px solid #16a34a;color:#4ade80;border-radius:20px;padding:4px 12px;font-size:11px;font-weight:bold;margin-bottom:14px';
-      badge.textContent = '✓ Authenticated as admin';
-
-      var title = document.createElement('p');
-      title.style.cssText = 'font-size:15px;font-weight:bold;color:#f59e0b;margin:0 0 4px';
-      title.textContent = 'Admin Dashboard';
-
-      var sub = document.createElement('p');
-      sub.style.cssText = 'font-size:12px;color:#64748b;margin:0 0 16px';
-      sub.textContent = 'Full access. This is what the attacker now sees.';
-
-      var box = document.createElement('div');
-      box.style.cssText = 'background:#0f172a;border:1px solid #7c3aed;border-radius:8px;padding:12px 14px';
-
-      var boxLabel = document.createElement('p');
-      boxLabel.style.cssText = 'font-size:10px;color:#7c3aed;letter-spacing:0.1em;margin:0 0 10px';
-      boxLabel.textContent = 'SENSITIVE CONFIGURATION';
-
-      var rows = [
-        ['DB_HOST',       'db.internal.corp'       ],
-        ['DB_PASSWORD',   'Sup3r$3cret_2024!'      ],
-        ['STRIPE_SECRET', 'sk_live_4Kq9...redacted'],
-        ['ADMIN_COUNT',   '14 accounts found'      ],
-      ];
-      box.appendChild(boxLabel);
-      rows.forEach(function(r) {
-        var row = document.createElement('div');
-        row.style.cssText = 'display:flex;justify-content:space-between;font-size:11px;padding:4px 0;border-bottom:1px solid #1e293b';
-        var k = document.createElement('span'); k.style.color = '#64748b'; k.textContent = r[0];
-        var v = document.createElement('span'); v.style.color = '#a78bfa'; v.textContent = r[1];
-        row.appendChild(k); row.appendChild(v); box.appendChild(row);
-      });
-
-      var btn = document.createElement('button');
-      btn.className = 'back-btn';
-      btn.onclick = backToLogin;
-      btn.textContent = '← Try another payload';
-
-      panel.appendChild(badge); panel.appendChild(title); panel.appendChild(sub);
-      panel.appendChild(box);   panel.appendChild(btn);
-      wrap.appendChild(panel);
-    }
-
-    window.addEventListener('DOMContentLoaded', function() { updateQuery(); });
-  </script>
-</head>
-<body>
-  <div class="topbar">
-    <span class="topbar-logo">🏢 AdminPortal</span>
-    <span class="topbar-sub">Internal access only</span>
-  </div>
-
-  <div class="page">
-    <!-- Login form -->
-    <div id="sec-login" style="width:100%;max-width:380px;display:flex;justify-content:center">
-      <div class="card">
-        <p class="card-title">Employee Login</p>
-        <p class="card-sub">Enter your credentials to continue.</p>
-        <label>Username</label>
-        <!-- auth query: db.query("SELECT * FROM users WHERE username = '" + req.body.username + "' AND password = '" + req.body.password + "'") -->
-        <input id="uname" type="text" value="{payload_escaped}" oninput="updateQuery()" autocomplete="off" spellcheck="false">
-        <label>Password</label>
-        <input id="pwd" type="text" placeholder="password" oninput="updateQuery()" autocomplete="off">
-        <button class="login-btn" onclick="login()">Login →</button>
-        <p id="err" class="err">✗ Invalid username or password.</p>
-        <div class="qs">
-          <p class="qs-label">GENERATED SQL QUERY</p>
-          <pre id="qpre" class="qs-pre"></pre>
-        </div>
-      </div>
-    </div>
-
-    <!-- Admin panel (built by JS on success) -->
-    <div id="sec-admin" style="width:100%;max-width:460px;justify-content:center;display:none"></div>
-
-    <!-- Regular user panel -->
-    <div id="sec-user" style="justify-content:center;display:none">
-      <div class="up">
-        <p class="up-title">Welcome back, alice.</p>
-        <p class="up-note">Logged in as a regular user. Admin access is restricted.</p>
-        <button class="back-btn" onclick="backToLogin()">← Back to login</button>
-      </div>
-    </div>
-  </div>
-</body>
-</html>`,
+      sqlSchema: {
+        uiType: 'login',
+        brand: 'AdminPortal',
+        brandColor: '#f59e0b',
+        btnColor: '#d97706',
+        tables: {
+          users: [
+            { id: 1, username: 'admin', password: 'c0rp$3cret!9', role: 'admin' },
+            { id: 2, username: 'alice', password: 'al1ce99pass',  role: 'user'  },
+          ],
+        },
+        queryTemplate: "SELECT * FROM users WHERE username = '{input}' AND password = '...'",
+        winCondition: "rows.some(function(r) { return r.role === 'admin'; })",
+        winMessage: 'SQLi Triggered! Logged in as admin — no password needed.',
+        successRows: [
+          ['DB_HOST',       'db.internal.corp'       ],
+          ['DB_PASSWORD',   'Sup3r$3cret_2024!'      ],
+          ['STRIPE_SECRET', 'sk_live_4Kq9...redacted'],
+          ['ADMIN_COUNT',   '14 accounts found'      ],
+        ],
+      },
       animation: [
         {
           type: "block",
@@ -1090,6 +897,224 @@ return-link.addEventListener('click', function(e) {
             { code: "'",        codeCls: "text-orange-400", desc: "closes the username string — you are now writing raw SQL", delay: 2.0 },
             { code: "--",       codeCls: "text-gray-500",   desc: "SQL line comment — everything after this is ignored", delay: 2.2 },
             { code: "AND password = '...'", codeCls: "text-gray-600", desc: "commented out — the password check never runs", delay: 2.4 },
+          ],
+        },
+      ],
+    },
+    {
+      id: "sqli-2-union",
+      title: "Challenge 2: The Product Search",
+      difficulty: 2,
+      points: 200,
+      targetName: "ShopDB",
+      editorLanguage: "plaintext",
+      sandboxType: "sql",
+      summary: "Use a UNION injection to extract credentials from a table the application never intended to expose.",
+      description:
+        "ShopDB is an internal product catalogue used by warehouse staff. The search field passes your input directly into a SQL LIKE query — no parameterization.\n\nThe query returns three columns: id, name, and price. SQL's UNION operator lets you attach a second SELECT to that same result set — but only if your injected SELECT also returns exactly three columns.\n\nTo find the vulnerability:\n· Submit any search term and observe the Generated Query box.\n· A single quote breaks out of the LIKE string and lets you write raw SQL.\n· Figure out how many columns the query returns, then inject a UNION SELECT that reads from a different table.",
+      goal: "Dump the users table — make admin's credentials appear in the search results.",
+      hints: [
+        "Type a single quote ' in the search box and click Search. The Generated Query shows your quote breaking out of the LIKE string — everything after it is now raw SQL.",
+        "A UNION SELECT must return the same number of columns as the original query. Probe the count: try ' ORDER BY 3 -- (works) vs ' ORDER BY 4 -- (error). The query has exactly 3 columns.",
+        "Confirm the count: ' UNION SELECT 1,2,3 -- should append a row with literal values 1, 2, 3 to the results. A wrong count gives a column-mismatch error instead.",
+        "The users table has columns: id, username, password. Replace the filler values: ' UNION SELECT 1, username, password FROM users --",
+      ],
+      solution: {
+        payload: "' UNION SELECT 1, username, password FROM users --",
+        explanation: [
+          "The original query returns 3 columns (id, name, price) via a LIKE match. UNION appends a second SELECT's rows to that result set.",
+          "A UNION requires both SELECTs to return the same number of columns. The payload provides 3: a filler 1 for the id slot, then username and password.",
+          "FROM users points the injected SELECT at a table the application never intended to expose — the users table holding account credentials.",
+          "The trailing -- comments out the rest of the original query (%'), keeping the SQL syntactically valid. The admin row now appears in the product results.",
+        ],
+      },
+      defense: {
+        summary: "The query was built by concatenating user input into a LIKE string. Parameterized queries prevent this — the database never interprets input as SQL code.",
+        measures: [
+          {
+            title: "Use parameterized queries (prepared statements)",
+            body: "Instead of db.query(\"WHERE name LIKE '%\" + input + \"%'\"), write db.query(\"WHERE name LIKE ?\", ['%' + input + '%']). The value is sent separately — the database treats it as data, never as SQL.",
+          },
+          {
+            title: "Apply column-level access control at the database layer",
+            body: "Grant the application's database user SELECT only on the columns and tables it actually needs. Even if UNION injection occurs, an attacker cannot read tables outside the granted scope.",
+          },
+          {
+            title: "Never concatenate user input into SQL strings",
+            body: "Any time input is joined into a SQL string — even inside a LIKE pattern — the code is vulnerable. Use an ORM or query builder; they parameterize automatically.",
+          },
+        ],
+      },
+      sqlSchema: {
+        uiType: 'search',
+        brand: 'ShopDB',
+        brandColor: '#38bdf8',
+        btnColor: '#0369a1',
+        tables: {
+          products: [
+            { id: 1, name: 'Laptop Pro X',        price: '$1,299' },
+            { id: 2, name: 'Wireless Mouse',      price: '$49'    },
+            { id: 3, name: 'USB-C Hub',           price: '$79'    },
+            { id: 4, name: 'Mechanical Keyboard', price: '$149'   },
+            { id: 5, name: 'Monitor 27in',        price: '$399'   },
+          ],
+          users: [
+            { id: 1, username: 'admin', password: 's3cr3tAdm1n!' },
+            { id: 2, username: 'alice', password: 'al1ce99pass'  },
+          ],
+        },
+        queryTemplate: "SELECT id, name, price FROM products WHERE name LIKE '%{input}%'",
+        columns: ['id', 'name', 'price'],
+        columnHeaders: ['ID', 'NAME', 'PRICE'],
+        winCondition: "rows.some(function(r) { return Object.values(r).some(function(v) { return String(v).toLowerCase() === 'admin'; }); })",
+        winMessage: 'SQLi Triggered! Users table dumped — admin credentials exposed.',
+      },
+      animation: [
+        {
+          type: "block",
+          label: "vulnerable query template",
+          accent: "gray",
+          delay: 0,
+          segments: [
+            { text: "WHERE name LIKE '%", cls: "text-gray-400" },
+            { text: "\" + search + \"", cls: "text-yellow-400 bg-yellow-400/10 rounded px-1 mx-0.5" },
+            { text: "%'", cls: "text-gray-400" },
+            { text: "↑ search term pasted directly into LIKE string — no parameterization", cls: "block text-xs text-yellow-600 mt-1 pl-1", delay: 0.4 },
+          ],
+        },
+        { type: "arrow", delay: 0.7, label: "payload: ' UNION SELECT 1, username, password FROM users --" },
+        {
+          type: "block",
+          label: "resulting SQL the database sees",
+          accent: "red",
+          delay: 0.9,
+          segments: [
+            { text: "WHERE name LIKE '%", cls: "text-gray-400" },
+            { text: "'", cls: "text-orange-400 font-bold", delay: 1.1 },
+            { text: " UNION SELECT ", cls: "text-red-400 font-bold", delay: 1.3 },
+            { text: "1, username, password", cls: "text-orange-300 font-bold", delay: 1.5 },
+            { text: " FROM ", cls: "text-red-400 font-bold", delay: 1.7 },
+            { text: "users", cls: "text-purple-400 font-bold", delay: 1.7 },
+            { text: " -- '%'", cls: "text-gray-600", delay: 1.9 },
+            { text: "↑ LIKE ends at ' — UNION appends a second SELECT that reads credentials from users", cls: "block text-xs text-red-500 mt-1 pl-1", delay: 2.1 },
+          ],
+        },
+        {
+          type: "legend",
+          delay: 2.3,
+          items: [
+            { code: "'", codeCls: "text-orange-400", desc: "closes the LIKE string — you are now writing raw SQL", delay: 2.3 },
+            { code: "UNION SELECT", codeCls: "text-red-400", desc: "appends a second query's rows — must return the same number of columns (3)", delay: 2.5 },
+            { code: "FROM users", codeCls: "text-purple-400", desc: "reads from a table the application never intended to expose", delay: 2.7 },
+            { code: "-- '%'", codeCls: "text-gray-500", desc: "comments out the trailing %' so the SQL remains valid", delay: 2.9 },
+          ],
+        },
+      ],
+    },
+    {
+      id: "sqli-3-stacked",
+      title: "Challenge 3: The Employee Directory",
+      difficulty: 3,
+      points: 300,
+      targetName: "StaffDB",
+      editorLanguage: "plaintext",
+      sandboxType: "sql",
+      summary: "Chain a second SQL statement using a semicolon to wipe an entire table the app never meant to modify.",
+      description:
+        "StaffDB is an internal HR portal. Warehouse staff use it to look up colleagues by department.\n\nThe department filter is built by pasting user input directly into a SQL WHERE clause — no parameterization. This is the same root cause as Challenge 1, but this time the goal isn't authentication bypass.\n\nSQL supports multiple statements separated by a semicolon (;). Most database drivers execute each statement in sequence. If you can escape the current string and append a semicolon, you can inject a completely independent second statement — one the application never called.\n\nTo explore the vulnerability:\n· Type a department name like Engineering and observe the Generated Query.\n· Try breaking out of the string with a single quote. What does the query look like?\n· Think about what comes after the semicolon.",
+      goal: "Use a stacked query to delete every row from the employees table.",
+      hints: [
+        "Type Engineering in the search box and study the Generated Query. Your input lands inside single quotes: WHERE dept = 'Engineering'. A single quote breaks out of that string.",
+        "After breaking out of the string with ', you can write raw SQL. A semicolon ; ends the current SELECT statement and lets you begin a brand-new one.",
+        "The second statement runs independently — it can be anything the database user is allowed to execute. What SQL command removes all rows from a table? (Hint: it starts with DELETE.)",
+        "The payload is: '; DELETE FROM employees WHERE 1=1 -- — the quote closes the string, ; starts a second statement, DELETE removes every row, and -- comments out the trailing quote.",
+      ],
+      solution: {
+        payload: "'; DELETE FROM employees WHERE 1=1 --",
+        explanation: [
+          "The original query was SELECT id, name, dept FROM employees WHERE dept = '...'. Your input landed directly inside the single quotes.",
+          "The leading ' closed the dept string early. After it you were writing raw SQL, not a value. The semicolon ; ended the SELECT statement entirely.",
+          "DELETE FROM employees WHERE 1=1 is a fully independent second statement. WHERE 1=1 is always true, so it matches and deletes every row.",
+          "The trailing -- comments out the closing ' that was left over from the original template. The database ran both statements: first the SELECT (which returned nothing), then the DELETE.",
+        ],
+      },
+      defense: {
+        summary: "Stacked queries are only possible because user input was concatenated directly into SQL. Parameterized queries prevent both the string escape and the statement injection.",
+        measures: [
+          {
+            title: "Use parameterized queries (prepared statements)",
+            body: "Instead of db.query(\"WHERE dept = '\" + input + \"'\"), write db.query(\"WHERE dept = ?\", [input]). The value is sent to the database as data — the driver never lets it become executable SQL, regardless of what characters it contains.",
+          },
+          {
+            title: "Apply least-privilege database permissions",
+            body: "The application's database user should only have SELECT on the tables it reads. A user without DELETE or DROP TABLE permission cannot execute destructive stacked queries even if injection occurs.",
+          },
+          {
+            title: "Use an ORM or query builder",
+            body: "Libraries like SQLAlchemy, Hibernate, and Sequelize generate parameterized queries automatically. You never concatenate input into SQL strings, so stacked-query injection cannot happen.",
+          },
+        ],
+      },
+      sqlSchema: {
+        uiType: 'stacked',
+        brand: 'StaffDB',
+        brandColor: '#a78bfa',
+        btnColor: '#7c3aed',
+        targetTable: 'employees',
+        tables: {
+          employees: [
+            { id: 1, name: 'Alice Chen',    dept: 'Engineering', salary: '$95,000'  },
+            { id: 2, name: 'Bob Martinez',  dept: 'Engineering', salary: '$88,000'  },
+            { id: 3, name: 'Carol White',   dept: 'HR',          salary: '$72,000'  },
+            { id: 4, name: 'David Kim',     dept: 'Finance',     salary: '$105,000' },
+            { id: 5, name: 'Eva Santos',    dept: 'Engineering', salary: '$91,000'  },
+          ],
+        },
+        queryTemplate: "SELECT id, name, dept FROM employees WHERE dept = '{input}'",
+        columns: ['id', 'name', 'dept'],
+        columnHeaders: ['ID', 'NAME', 'DEPARTMENT'],
+        winCondition: "!alasql.tables.employees || alasql.tables.employees.data.length === 0",
+        winMessage: "Stacked Query Executed! All employee records wiped.",
+      },
+      animation: [
+        {
+          type: "block",
+          label: "vulnerable query template",
+          accent: "gray",
+          delay: 0,
+          segments: [
+            { text: "WHERE dept = '", cls: "text-gray-400" },
+            { text: "\" + dept + \"", cls: "text-yellow-400 bg-yellow-400/10 rounded px-1 mx-0.5" },
+            { text: "'", cls: "text-gray-400" },
+            { text: "↑ department name pasted directly — no parameterization", cls: "block text-xs text-yellow-600 mt-1 pl-1", delay: 0.4 },
+          ],
+        },
+        { type: "arrow", delay: 0.7, label: "payload: '; DELETE FROM employees WHERE 1=1 --" },
+        {
+          type: "block",
+          label: "resulting SQL — two statements execute",
+          accent: "red",
+          delay: 0.9,
+          segments: [
+            { text: "WHERE dept = '", cls: "text-gray-400" },
+            { text: "'", cls: "text-orange-400 font-bold", delay: 1.1 },
+            { text: " ;", cls: "text-red-400 font-bold", delay: 1.2 },
+            { text: " DELETE FROM ", cls: "text-red-400 font-bold", delay: 1.4 },
+            { text: "employees", cls: "text-purple-400 font-bold", delay: 1.6 },
+            { text: " WHERE 1=1 ", cls: "text-orange-300 font-bold", delay: 1.8 },
+            { text: "--'", cls: "text-gray-600", delay: 2.0 },
+            { text: "↑ ; ends the SELECT — DELETE runs as a second independent statement", cls: "block text-xs text-red-500 mt-1 pl-1", delay: 2.1 },
+          ],
+        },
+        {
+          type: "legend",
+          delay: 2.3,
+          items: [
+            { code: "'",                   codeCls: "text-orange-400", desc: "closes the dept string — you are now writing raw SQL", delay: 2.3 },
+            { code: ";",                   codeCls: "text-red-400",    desc: "terminates the SELECT and begins a second, independent statement", delay: 2.5 },
+            { code: "DELETE FROM employees", codeCls: "text-purple-400", desc: "second statement — wipes the entire table", delay: 2.7 },
+            { code: "WHERE 1=1",           codeCls: "text-orange-300", desc: "always true — matches and deletes every row without exception", delay: 2.9 },
+            { code: "--'",                 codeCls: "text-gray-500",   desc: "comments out the trailing quote left over from the template", delay: 3.1 },
           ],
         },
       ],

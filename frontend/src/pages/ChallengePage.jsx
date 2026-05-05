@@ -5,6 +5,7 @@ import Editor from "@monaco-editor/react";
 import api from "../api/client";
 import { CHALLENGES } from "../data/challenges";
 import SolutionAnimation from "../components/SolutionAnimation";
+import { buildSqlPage } from "../utils/sqlSandbox";
 
 const MIN_W = 200;
 
@@ -240,13 +241,16 @@ export default function ChallengePage({ alias }) {
   const hasNext = challengeIndex < topicChallenges.length - 1;
 
   const isSrcdoc = challenge?.sandboxType === "srcdoc";
+  const isSql    = challenge?.sandboxType === "sql";
 
   const [payload, setPayload]         = useState("");
   const [sandboxPort, setSandboxPort] = useState(null);
-  // srcdoc challenges are ready immediately; container challenges wait for the sandbox
-  const [loading, setLoading]         = useState(!isSrcdoc);
+  // srcdoc/sql challenges are ready immediately; container challenges wait for the sandbox
+  const [loading, setLoading]         = useState(!isSrcdoc && !isSql);
   const [srcdoc, setSrcdoc]           = useState(
-    isSrcdoc ? substituteTemplate(challenge.pageTemplate, "") : ""
+    isSrcdoc ? substituteTemplate(challenge.pageTemplate, "") :
+    isSql    ? buildSqlPage(challenge.sqlSchema) :
+    ""
   );
   const [sandboxError, setSandboxError] = useState(null);
   const [solved, setSolved]           = useState(false);
@@ -295,7 +299,13 @@ export default function ChallengePage({ alias }) {
     if (isSrcdoc) {
       setSrcdoc(substituteTemplate(challenge.pageTemplate, ""));
       setLoading(false);
-      return; // no container to start or stop
+      return;
+    }
+
+    if (isSql) {
+      setSrcdoc(buildSqlPage(challenge.sqlSchema));
+      setLoading(false);
+      return;
     }
 
     // Container-based challenge — start the Docker sandbox
@@ -339,9 +349,10 @@ export default function ChallengePage({ alias }) {
     if (!trimmed || submitting || solved) return;
     setSubmitting(true);
 
-    if (isSrcdoc) {
-      // Substitute payload into the page template and update srcdoc.
-      // {payload} is inserted raw (the vulnerability); {payload_escaped} is safe.
+    if (isSql) {
+      // Send payload to the already-running iframe — no reload needed.
+      iframeRef.current?.contentWindow?.postMessage({ type: "run", payload: trimmed }, "*");
+    } else if (isSrcdoc) {
       setSrcdoc(substituteTemplate(challenge.pageTemplate, trimmed));
     } else if (sandboxPort && iframeRef.current) {
       const path = challenge.injectPath.replace("{payload}", encodeURIComponent(trimmed));
@@ -569,8 +580,8 @@ export default function ChallengePage({ alias }) {
               </div>
             )}
 
-            {isSrcdoc ? (
-              // srcdoc challenges render entirely in the browser — no container
+            {(isSrcdoc || isSql) ? (
+              // srcdoc/sql challenges render entirely in the browser — no container
               <iframe
                 ref={iframeRef}
                 srcDoc={srcdoc}

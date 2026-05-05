@@ -166,7 +166,7 @@ export const LEARN_CONTENT = {
 SELECT * FROM users
 WHERE username = 'alice' AND password = 'hunter2';
 
--- Attacker types this into the username field:    admin' --
+-- Attacker types this into the username field: admin' --
 -- The server pastes it in without escaping the quote:
 SELECT * FROM users
 WHERE username = 'admin' --' AND password = '';
