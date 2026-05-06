@@ -104,49 +104,90 @@ const SHARED_JS = `
       out.innerHTML = '<span class="con-ph">Run a query from the editor to explore the database.</span>';
       return;
     }
-    var res, err;
-    try { res = alasql(sql.trim()); err = null; }
-    catch(e) { res = null; err = e.message; }
-    if (err) {
-      var ed = document.createElement('div'); ed.className = 'con-err';
-      ed.textContent = err; out.appendChild(ed); return;
-    }
-    // Normalise to array of row-objects
-    var rows;
-    if (Array.isArray(res) && res.length > 0 && Array.isArray(res[0])) {
-      rows = res[0];
-    } else if (Array.isArray(res)) {
-      rows = res;
-    } else if (typeof res === 'number') {
-      var inf = document.createElement('div'); inf.className = 'con-ok';
-      inf.textContent = res + ' row' + (res !== 1 ? 's' : '') + ' affected';
-      out.appendChild(inf); return;
-    } else { rows = []; }
-    if (!rows.length) {
-      var emp = document.createElement('div'); emp.className = 'con-ok';
-      emp.textContent = '(no rows)'; out.appendChild(emp); return;
-    }
-    if (typeof rows[0] !== 'object' || rows[0] === null) {
-      var prim = document.createElement('div'); prim.className = 'con-ok';
-      prim.textContent = rows.join(', '); out.appendChild(prim); return;
-    }
-    var keys = Object.keys(rows[0]);
-    var tbl = document.createElement('table');
-    var htr = document.createElement('tr');
-    keys.forEach(function(k) {
-      var th = document.createElement('th'); th.textContent = k; htr.appendChild(th);
-    });
-    tbl.appendChild(htr);
-    rows.forEach(function(r) {
-      var tr = document.createElement('tr');
+    try {
+      // SHOW TABLES — string comparison avoids backslash-in-template-literal regex issues
+      var sqlClean = sql.trim().toUpperCase();
+      if (sqlClean.charAt(sqlClean.length - 1) === ';') sqlClean = sqlClean.slice(0, -1).trim();
+      if (sqlClean === 'SHOW TABLES') {
+        var tableNames = typeof TABLES !== 'undefined' ? Object.keys(TABLES) : [];
+        if (!tableNames.length) {
+          var emp2 = document.createElement('div'); emp2.className = 'con-ok';
+          emp2.textContent = '(no tables)'; out.appendChild(emp2); return;
+        }
+        var stbl = document.createElement('table');
+        var shtr = document.createElement('tr');
+        var sth = document.createElement('th'); sth.textContent = 'TABLE_NAME'; shtr.appendChild(sth);
+        stbl.appendChild(shtr);
+        tableNames.forEach(function(name) {
+          var str = document.createElement('tr');
+          var std = document.createElement('td'); std.textContent = name; str.appendChild(std);
+          stbl.appendChild(str);
+        });
+        out.appendChild(stbl); return;
+      }
+
+      // Block direct reads of restricted tables — students must use the injection vector
+      if (typeof RESTRICTED_TABLES !== 'undefined' && RESTRICTED_TABLES.length) {
+        var sqlUp = sql.trim().toUpperCase();
+        var hit = RESTRICTED_TABLES.filter(function(t) {
+          var tUp = t.toUpperCase();
+          return sqlUp.indexOf('FROM ' + tUp) !== -1 || sqlUp.indexOf('JOIN ' + tUp) !== -1;
+        });
+        if (hit.length) {
+          var denied = document.createElement('div'); denied.className = 'con-err';
+          denied.textContent = "ERROR 1142: SELECT denied on '" + hit[0] +
+            "'. Use the injection vector in the portal above to surface this data.";
+          out.appendChild(denied); return;
+        }
+      }
+
+      var res, err;
+      try { res = alasql(sql.trim()); err = null; }
+      catch(e) { res = null; err = e.message; }
+      if (err) {
+        var ed = document.createElement('div'); ed.className = 'con-err';
+        ed.textContent = err; out.appendChild(ed); return;
+      }
+      // Normalise to array of row-objects
+      var rows;
+      if (Array.isArray(res) && res.length > 0 && Array.isArray(res[0])) {
+        rows = res[0];
+      } else if (Array.isArray(res)) {
+        rows = res;
+      } else if (typeof res === 'number') {
+        var inf = document.createElement('div'); inf.className = 'con-ok';
+        inf.textContent = res + ' row' + (res !== 1 ? 's' : '') + ' affected';
+        out.appendChild(inf); return;
+      } else { rows = []; }
+      if (!rows.length) {
+        var emp = document.createElement('div'); emp.className = 'con-ok';
+        emp.textContent = '(no rows)'; out.appendChild(emp); return;
+      }
+      if (typeof rows[0] !== 'object' || rows[0] === null) {
+        var prim = document.createElement('div'); prim.className = 'con-ok';
+        prim.textContent = rows.join(', '); out.appendChild(prim); return;
+      }
+      var keys = Object.keys(rows[0]);
+      var tbl = document.createElement('table');
+      var htr = document.createElement('tr');
       keys.forEach(function(k) {
-        var td = document.createElement('td');
-        td.textContent = r[k] !== undefined ? String(r[k]) : '';
-        tr.appendChild(td);
+        var th = document.createElement('th'); th.textContent = k; htr.appendChild(th);
       });
-      tbl.appendChild(tr);
-    });
-    out.appendChild(tbl);
+      tbl.appendChild(htr);
+      rows.forEach(function(r) {
+        var tr = document.createElement('tr');
+        keys.forEach(function(k) {
+          var td = document.createElement('td');
+          td.textContent = r[k] !== undefined ? String(r[k]) : '';
+          tr.appendChild(td);
+        });
+        tbl.appendChild(tr);
+      });
+      out.appendChild(tbl);
+    } catch(fatal) {
+      var ferr = document.createElement('div'); ferr.className = 'con-err';
+      ferr.textContent = 'Terminal error: ' + (fatal.message || fatal); out.appendChild(ferr);
+    }
   }
 
   function renderQuery(preId, tmpl, input) {
@@ -187,11 +228,12 @@ function buildLoginPage(s) {
 </style>
 <script src="${ALASQL_CDN}"></script>
 <script>
-var TABLES   = ${JSON.stringify(s.tables)};
-var QT       = ${JSON.stringify(s.queryTemplate)};
-var WIN_COND = ${JSON.stringify(s.winCondition)};
-var WIN_MSG  = ${JSON.stringify(winMsg)};
-var SUC_ROWS = ${JSON.stringify(successRows)};
+var TABLES            = ${JSON.stringify(s.tables)};
+var QT                = ${JSON.stringify(s.queryTemplate)};
+var WIN_COND          = ${JSON.stringify(s.winCondition)};
+var WIN_MSG           = ${JSON.stringify(winMsg)};
+var SUC_ROWS          = ${JSON.stringify(successRows)};
+var RESTRICTED_TABLES = ${JSON.stringify(s.restrictedTables || [])};
 
 ${SHARED_JS}
 
@@ -359,12 +401,13 @@ function buildSearchPage(s) {
 </style>
 <script src="${ALASQL_CDN}"></script>
 <script>
-var TABLES   = ${JSON.stringify(s.tables)};
-var QT       = ${JSON.stringify(s.queryTemplate)};
-var WIN_COND = ${JSON.stringify(s.winCondition)};
-var WIN_MSG  = ${JSON.stringify(winMsg)};
-var COLS     = ${JSON.stringify(cols)};
-var COL_HDR  = ${JSON.stringify(colHeaders)};
+var TABLES            = ${JSON.stringify(s.tables)};
+var QT                = ${JSON.stringify(s.queryTemplate)};
+var WIN_COND          = ${JSON.stringify(s.winCondition)};
+var WIN_MSG           = ${JSON.stringify(winMsg)};
+var COLS              = ${JSON.stringify(cols)};
+var COL_HDR           = ${JSON.stringify(colHeaders)};
+var RESTRICTED_TABLES = ${JSON.stringify(s.restrictedTables || [])};
 
 ${SHARED_JS}
 
@@ -501,13 +544,14 @@ function buildStackedPage(s) {
 </style>
 <script src="${ALASQL_CDN}"></script>
 <script>
-var TABLES     = ${JSON.stringify(s.tables)};
-var QT         = ${JSON.stringify(s.queryTemplate)};
-var WIN_COND   = ${JSON.stringify(s.winCondition)};
-var WIN_MSG    = ${JSON.stringify(winMsg)};
-var COLS       = ${JSON.stringify(cols)};
-var COL_HDR    = ${JSON.stringify(colHeaders)};
-var TABLE_NAME = ${JSON.stringify(tableName)};
+var TABLES            = ${JSON.stringify(s.tables)};
+var QT                = ${JSON.stringify(s.queryTemplate)};
+var WIN_COND          = ${JSON.stringify(s.winCondition)};
+var WIN_MSG           = ${JSON.stringify(winMsg)};
+var COLS              = ${JSON.stringify(cols)};
+var COL_HDR           = ${JSON.stringify(colHeaders)};
+var TABLE_NAME        = ${JSON.stringify(tableName)};
+var RESTRICTED_TABLES = ${JSON.stringify(s.restrictedTables || [])};
 
 ${SHARED_JS}
 

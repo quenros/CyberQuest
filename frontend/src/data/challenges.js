@@ -808,7 +808,7 @@ return-link.addEventListener('click', function(e) {
       editorLabel: "SQL Terminal",
       editorAction: "Run Query",
       editorPlaceholder: "SHOW TABLES",
-      editorHint: "Use this terminal to run any SQL query and explore the database — try SHOW TABLES or SELECT * FROM tablename. Results appear in the SQL Terminal panel inside the portal. To solve the challenge, type your injection payload directly into the Username field in the login form and click Login.",
+      editorHint: "Use this terminal to explore the database schema — try SHOW TABLES to see what tables exist. Direct reads of sensitive tables are blocked here; use the injection vector in the login form to surface that data. To solve the challenge, type your payload into the Username field and click Login.",
       summary: "Inject SQL into a login form to bypass authentication without a password.",
       description:
         "AdminPortal is a corporate login page. Only employees with valid credentials can access the admin dashboard.\n\nThe developer built the login query by pasting the username directly into a SQL string — no parameterization. This is the most common cause of SQL injection.\n\nTo find the vulnerability:\n· Submit any username and look at the Generated Query box below the login form.\n· Notice exactly where your input lands in the SQL. Think about what happens if your input contains a quote character.",
@@ -850,6 +850,7 @@ return-link.addEventListener('click', function(e) {
         brand: 'AdminPortal',
         brandColor: '#f59e0b',
         btnColor: '#d97706',
+        restrictedTables: ['users'],
         tables: {
           users: [
             { id: 1, username: 'admin', password: 'c0rp$3cret!9', role: 'admin' },
@@ -916,7 +917,7 @@ return-link.addEventListener('click', function(e) {
       editorLabel: "SQL Terminal",
       editorAction: "Run Query",
       editorPlaceholder: "SHOW TABLES",
-      editorHint: "Use this terminal to run any SQL query and explore the database — try SHOW TABLES or SELECT * FROM tablename. Results appear in the SQL Terminal panel inside the portal. To solve the challenge, type your injection payload directly into the Product Search bar in the portal and click Search.",
+      editorHint: "Use this terminal to explore the database schema — try SHOW TABLES to see what tables exist, or SELECT * FROM products to inspect queryable data. Direct reads of sensitive tables are blocked here; use the injection vector in the search bar to surface that data. To solve the challenge, type your payload into the Product Search bar and click Search.",
       summary: "Use a UNION injection to extract credentials from a table the application never intended to expose.",
       description:
         "ShopDB is an internal product catalogue used by warehouse staff. The search field passes your input directly into a SQL LIKE query — no parameterization.\n\nThe query returns three columns: id, name, and price. SQL's UNION operator lets you attach a second SELECT to that same result set — but only if your injected SELECT also returns exactly three columns.\n\nTo find the vulnerability:\n· Use the SQL Terminal on the left to explore the database schema.\n· Submit any search term in the portal and observe the Generated Query box.\n· A single quote breaks out of the LIKE string and lets you write raw SQL.\n· Figure out how many columns the query returns, then inject a UNION SELECT that reads from a table you discovered.",
@@ -958,6 +959,7 @@ return-link.addEventListener('click', function(e) {
         brand: 'ShopDB',
         brandColor: '#38bdf8',
         btnColor: '#0369a1',
+        restrictedTables: ['users'],
         tables: {
           products: [
             { id: 1, name: 'Laptop Pro X',        price: '$1,299' },

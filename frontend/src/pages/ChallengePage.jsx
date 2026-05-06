@@ -351,7 +351,6 @@ export default function ChallengePage({ alias }) {
     setSubmitting(true);
 
     if (isSql) {
-      // Send payload to the already-running iframe — no reload needed.
       iframeRef.current?.contentWindow?.postMessage({ type: "sql", query: trimmed }, "*");
     } else if (isSrcdoc) {
       setSrcdoc(substituteTemplate(challenge.pageTemplate, trimmed));
