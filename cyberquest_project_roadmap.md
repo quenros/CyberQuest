@@ -37,6 +37,52 @@ React, Tailwind CSS, Framer Motion, Flask, MongoDB, Docker, Claude API (AI hints
 
 ## Development Changelog
 
+### Checkpoint — 2026-05-06
+
+#### SQL Injection Module — Challenges & Lectures
+
+**SQLi Infrastructure — `sqlSandbox.js`**
+- New `frontend/src/utils/sqlSandbox.js` utility generates self-contained `srcdoc` HTML for all SQLi challenges — no Docker required for this module
+- Three page builders exported via `buildSqlPage(schema)`:
+  - `buildLoginPage` — corporate login form with admin panel reveal on successful bypass
+  - `buildSearchPage` — product catalogue with UNION-highlighted injected rows (orange tint)
+  - `buildStackedPage` — employee directory with live "employees table N rows" counter and Reset DB button
+- All three pages share: AlaSQL in-browser SQL engine (CDN), `SHARED_CSS` dark theme, `SHARED_JS` runtime helpers (`initDb`, `winBanner`, `checkWin`, `runConsole`, `renderQuery`)
+- Live **Generated SQL Query** panel updates on every keystroke — input highlighted orange when it contains a quote, blue otherwise
+- **SQL Terminal · RECON** panel inside every sandbox accepts free-form SQL via `postMessage({type:'sql', query})` from the parent frame; results render as a mini table or error line
+
+**Challenge 1 — Login Bypass (`sqli-1-login`, AdminPortal)**
+- Classic `' OR 1=1 --` / `admin' --` authentication bypass
+- Login form with Username/Password fields; Generated Query panel shows live query construction
+- On win: admin dashboard panel reveals with SENSITIVE CONFIGURATION key-value rows
+- On partial match: "Welcome back, [user]" panel with back button
+
+**Challenge 2 — UNION Data Exfiltration (`sqli-2-union`, ShopDB)**
+- Product catalogue search; vulnerable `LIKE '%{input}%'` query
+- Injected rows rendered with orange highlight to visually distinguish them from real product rows
+- Win condition: UNION SELECT surfaces a row from the hidden `users` table
+- Bridge lecture "UNION Injection & Schema Discovery" unlocks between challenges 1 and 2
+
+**Challenge 3 — Stacked Query Destruction (`sqli-3-stacked`, StaffDB)**
+- Employee directory filter; vulnerable `WHERE dept = '{input}'` query
+- Live row counter updates after each query — students watch the table shrink to 0 rows
+- Reset DB button restores original data so students can experiment freely
+- Win condition: `employees` table completely emptied via `'; DELETE FROM employees WHERE 1=1 --`
+- Bridge lecture "Stacked Queries" unlocks between challenges 2 and 3
+
+**SQLi Learn Page (`learnContent.js` — `sqli` key)**
+- Intro, How-it-works flow, Basic payload code block, Why-it's-dangerous cards (4 cards: bypass, exfiltration, destruction, privilege escalation), Types section (Classic / Blind / Time-based), Recon step-0 code block, CTA
+- **Bridge lecture: "UNION Injection & Schema Discovery"** — intro, schema discovery code, injection visualiser (count columns with ORDER BY), UNION rules code, putting-it-together injection visualiser, CTA
+- **Bridge lecture: "Stacked Queries"** — intro, injection visualiser (semicolon chaining), WHERE 1=1 code block, stacked query attack flow, CTA
+
+**Editor context fields added to all SQLi challenges:**
+- `editorLabel`: "SQL Terminal" (sends raw SQL to the recon console via `postMessage`)
+- `editorAction`: challenge-specific (e.g. "Run Query", "Run UNION", "Run Stack")
+- `editorHint`: explains the dual role — terminal for recon, payload typed directly into the portal UI
+- `editorPlaceholder`: challenge-specific SQL hint
+
+---
+
 ### Checkpoint — 2026-04-27
 
 #### XSS Module — Challenge & Content Polish
@@ -237,10 +283,15 @@ Added four new data fields to every challenge in `challenges.js`:
 - Give teachers visibility
 
 #### Second Module (SQL Injection)
-- [ ] Interactive demo (login form bypass)
-- [ ] 4 progressive challenges
+- [x] Interactive learn page (intro, attack flow, payload example, danger cards, types, recon step-0)
+- [x] Bridge lectures between challenges (UNION Injection & Schema Discovery, Stacked Queries)
+- [x] Challenge 1: Login bypass — AdminPortal (`admin' --`)
+- [x] Challenge 2: UNION exfiltration — ShopDB (dump hidden users table)
+- [x] Challenge 3: Stacked query destruction — StaffDB (`'; DELETE FROM employees WHERE 1=1 --`)
+- [x] In-browser SQL sandbox (`sqlSandbox.js`) — no Docker needed; AlaSQL powers all three challenges
+- [x] Context-aware editor fields (editorLabel, editorAction, editorHint, editorPlaceholder)
+- [ ] Challenge 4+: Blind SQLi or error-based — deferred
 - [ ] AI hints tailored to SQL context
-- [ ] Same UX patterns as XSS module
 
 #### Teacher Dashboard
 - [ ] Class overview (which students, progress)
@@ -327,7 +378,15 @@ Added four new data fields to every challenge in `challenges.js`:
    - ✅ Challenge 4: Attribute injection — ProfileHub username field (`onclick`)
    - ✅ Challenge 5: Stored XSS — NoteNest cookie exfiltration (Docker container)
    - ✅ Learn page with intro, attack flow, code example, injection visualiser, danger cards, XSS types
-2. **SQL Injection** — Classic, students love "hacking" databases
+2. **SQL Injection** ✅ In progress — 3 challenges built, learn page + 2 bridge lectures complete
+   - ✅ Learn page: intro, attack flow, payload code, danger cards (bypass/exfiltration/destruction/escalation), types (Classic/Blind/Time-based), recon step-0, CTA
+   - ✅ Bridge lecture: "UNION Injection & Schema Discovery" (schema recon, column counting, UNION rules, visualisers)
+   - ✅ Bridge lecture: "Stacked Queries" (semicolon chaining, WHERE 1=1, attack flow)
+   - ✅ Challenge 1: Login bypass — AdminPortal (`admin' --`)
+   - ✅ Challenge 2: UNION exfiltration — ShopDB (dump hidden users table)
+   - ✅ Challenge 3: Stacked query destruction — StaffDB (DELETE all rows)
+   - ✅ In-browser SQL sandbox (`sqlSandbox.js`): 3 page types (login, search, stacked), AlaSQL engine, live query visualiser, SQL Terminal recon panel
+   - [ ] Challenge 4+: Blind SQLi — deferred
 
 #### Tier 2 (Week 7-8)
 3. **Input Validation** — Foundation concept, ties to both XSS and SQL
@@ -439,7 +498,10 @@ Added four new data fields to every challenge in `challenges.js`:
 - [ ] UX polished
 
 ### Week 5
-- [ ] SQL Injection module: 4 challenges
+- [x] SQL Injection module: 3 challenges (login bypass, UNION exfiltration, stacked destruction)
+- [x] SQL learn page + 2 bridge lectures (UNION, Stacked Queries)
+- [x] In-browser SQL sandbox (`sqlSandbox.js`) — login, search, stacked page types
+- [ ] SQL Injection module: challenge 4 (blind SQLi) — deferred
 - [ ] Teacher dashboard MVP
 
 ### Week 6
