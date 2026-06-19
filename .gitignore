@@ -13,3 +13,12 @@ __pycache__/
 *.pyc
 *.pyo
 .pytest_cache/
+
+# Claude / agent skills — installed via "npx skills@latest add mattpocock/skills"
+# Reinstall from skills-lock.json. Treat like node_modules.
+.claude/skills/
+.agents/
+
+# Playwright test artifacts
+frontend/test-results/
+frontend/playwright-report/

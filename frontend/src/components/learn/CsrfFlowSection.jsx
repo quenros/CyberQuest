@@ -13,10 +13,11 @@ function Actor({ label, icon, color }) {
 export default function CsrfFlowSection() {
   const [scope, animate] = useAnimate()
   const played = useRef(false)
+  const arrowRef = useRef(null)
 
   async function playSequence() {
-    // Reset
-    await animate('.cookie-badge', { opacity: 0, x: 0 }, { duration: 0 })
+    // Reset — bring badge back to start before replaying
+    await animate('.cookie-badge', { opacity: 0, x: 0 }, { duration: 0.15 })
     await animate('.request-line', { scaleX: 0, opacity: 0 }, { duration: 0 })
     await animate('.server-box', { borderColor: 'rgb(55 65 81)' }, { duration: 0 })
     await animate('.state-change', { opacity: 0 }, { duration: 0 })
@@ -27,8 +28,9 @@ export default function CsrfFlowSection() {
     // 2. Request line draws from victim browser toward server
     await animate('.request-line', { scaleX: 1, opacity: 1 }, { duration: 0.5, ease: 'easeOut' })
 
-    // 3. Cookie badge slides along the arrow
-    await animate('.cookie-badge', { opacity: 1, x: 80 }, { duration: 0.6, ease: 'easeInOut' })
+    // 3. Cookie badge slides along the arrow — travel 40% of the arrow's actual width
+    const arrowWidth = arrowRef.current?.offsetWidth ?? 200
+    await animate('.cookie-badge', { opacity: 1, x: arrowWidth * 0.4 }, { duration: 0.6, ease: 'easeInOut' })
 
     // 4. Server receives the request — border flashes red
     await animate('.server-box', { borderColor: ['rgb(55 65 81)', 'rgb(239 68 68)', 'rgb(239 68 68)'] }, { duration: 0.4 })
@@ -70,19 +72,19 @@ export default function CsrfFlowSection() {
           <span className="text-xs text-gray-500 mb-1">Victim's browser</span>
           <Actor label="Victim" icon="👤" color="border-gray-700" />
         </div>
-        <div className="server-box rounded-xl border border-gray-700 p-0 transition-colors duration-300">
+        <div className="server-box rounded-xl border border-gray-700 p-0">
           <Actor label="Server" icon="🖥️" color="border-transparent" />
         </div>
       </div>
 
       {/* Animated request arrow with cookie badge */}
-      <div className="relative flex items-center mb-6 px-4">
+      <div ref={arrowRef} className="relative flex items-center mb-6 px-4">
         <motion.div
           className="request-line h-0.5 bg-red-500 flex-1 origin-left"
           style={{ scaleX: 0, opacity: 0 }}
         />
         <motion.div
-          className="cookie-badge absolute left-1/4 -top-3 bg-gray-800 border border-yellow-500/60 text-yellow-400 rounded-full px-2 py-0.5 text-xs font-mono"
+          className="cookie-badge absolute left-4 -top-5 bg-gray-800 border border-yellow-500/60 text-yellow-400 rounded-full px-2 py-0.5 text-xs font-mono whitespace-nowrap"
           style={{ opacity: 0, x: 0 }}
         >
           🍪 session_id=abc123
