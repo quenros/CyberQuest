@@ -49,7 +49,7 @@ export const TOPICS = [
     difficulty: 3,
     color: "purple",
     icon: "🎭",
-    unlocked: false,
+    unlocked: true,
     lecture: {
       title: "Introduction to CSRF",
       description: "Learn how attackers forge requests on behalf of authenticated users.",

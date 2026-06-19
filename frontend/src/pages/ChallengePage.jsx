@@ -7,6 +7,7 @@ import { CHALLENGES } from "../data/challenges";
 import { TOPICS } from "../data/topics";
 import SolutionAnimation from "../components/SolutionAnimation";
 import { buildSqlPage } from "../utils/sqlSandbox";
+import { buildAttackerSrcdoc, buildVictimSrcdoc } from "../utils/csrfSandbox";
 
 const MIN_W = 200;
 
@@ -243,15 +244,20 @@ export default function ChallengePage({ alias }) {
 
   const isSrcdoc = challenge?.sandboxType === "srcdoc";
   const isSql    = challenge?.sandboxType === "sql";
+  const isCsrf   = challenge?.sandboxType === "csrf";
 
   const [payload, setPayload]         = useState("");
   const [sandboxPort, setSandboxPort] = useState(null);
-  // srcdoc/sql challenges are ready immediately; container challenges wait for the sandbox
-  const [loading, setLoading]         = useState(!isSrcdoc && !isSql);
+  // srcdoc/sql/csrf challenges are ready immediately; container challenges wait for the sandbox
+  const [loading, setLoading]         = useState(!isSrcdoc && !isSql && !isCsrf);
   const [srcdoc, setSrcdoc]           = useState(
     isSrcdoc ? substituteTemplate(challenge.pageTemplate, "") :
     isSql    ? buildSqlPage(challenge.sqlSchema) :
+    isCsrf   ? buildAttackerSrcdoc("") :
     ""
+  );
+  const [victimSrcdoc] = useState(
+    isCsrf ? buildVictimSrcdoc(challenge?.id) : ""
   );
   const [sandboxError, setSandboxError] = useState(null);
   const [solved, setSolved]           = useState(false);
@@ -266,16 +272,25 @@ export default function ChallengePage({ alias }) {
   const [centerW, setCenterW] = useState(380);
 
   const iframeRef       = useRef(null);
+  const victimIframeRef = useRef(null);
   const isNavigatingRef = useRef(false);
 
-  // ── postMessage listener — replaces the old polling approach ──────────────
-  // The vulnerable page sends { type: 'xss-triggered' } to the parent frame
-  // the moment the XSS fires, making detection instant with no server round-trip.
+  // ── postMessage listener ───────────────────────────────────────────────────
+  // XSS challenges: sandbox fires { type: 'xss-triggered' } on win.
+  // CSRF challenges: attacker iframe fires { type: 'csrf-request' }; parent
+  //   forwards to victim iframe. Victim fires { type: 'csrf-triggered' } on win.
   useEffect(() => {
     function onMessage(e) {
       if (e.data?.type === "xss-triggered") {
         setSolved(true);
         setShowModal(true);
+      }
+      if (e.data?.type === "csrf-triggered") {
+        setSolved(true);
+        setShowModal(true);
+      }
+      if (e.data?.type === "csrf-request" && victimIframeRef.current) {
+        victimIframeRef.current.contentWindow?.postMessage(e.data, "*");
       }
     }
     window.addEventListener("message", onMessage);
@@ -305,6 +320,12 @@ export default function ChallengePage({ alias }) {
 
     if (isSql) {
       setSrcdoc(buildSqlPage(challenge.sqlSchema));
+      setLoading(false);
+      return;
+    }
+
+    if (isCsrf) {
+      setSrcdoc(buildAttackerSrcdoc(""));
       setLoading(false);
       return;
     }
@@ -352,6 +373,8 @@ export default function ChallengePage({ alias }) {
 
     if (isSql) {
       iframeRef.current?.contentWindow?.postMessage({ type: "sql", query: trimmed }, "*");
+    } else if (isCsrf) {
+      setSrcdoc(buildAttackerSrcdoc(trimmed));
     } else if (isSrcdoc) {
       setSrcdoc(substituteTemplate(challenge.pageTemplate, trimmed));
     } else if (sandboxPort && iframeRef.current) {
@@ -584,7 +607,35 @@ export default function ChallengePage({ alias }) {
               </div>
             )}
 
-            {(isSrcdoc || isSql) ? (
+            {isCsrf ? (
+              // CSRF challenges show two panes: attacker page (left) + victim session (right)
+              <div className="h-full flex">
+                <div className="flex flex-col flex-1 min-w-0 border-r border-gray-800">
+                  <div className="border-b border-gray-800 px-3 py-1 text-xs text-red-400/70 flex-shrink-0 bg-gray-950">
+                    ATTACKER PAGE (your HTML)
+                  </div>
+                  <iframe
+                    ref={iframeRef}
+                    srcDoc={srcdoc}
+                    sandbox="allow-scripts"
+                    className="h-full w-full border-0"
+                    title="Attacker Page"
+                  />
+                </div>
+                <div className="flex flex-col flex-1 min-w-0">
+                  <div className="border-b border-gray-800 px-3 py-1 text-xs text-green-400/70 flex-shrink-0 bg-gray-950">
+                    VICTIM SESSION (logged in)
+                  </div>
+                  <iframe
+                    ref={victimIframeRef}
+                    srcDoc={victimSrcdoc}
+                    sandbox="allow-scripts"
+                    className="h-full w-full border-0"
+                    title="Victim Session"
+                  />
+                </div>
+              </div>
+            ) : (isSrcdoc || isSql) ? (
               // srcdoc/sql challenges render entirely in the browser — no container
               <iframe
                 ref={iframeRef}

@@ -1135,4 +1135,262 @@ return-link.addEventListener('click', function(e) {
       ],
     },
   ],
+
+  csrf: [
+    {
+      id: "csrf-1-get",
+      title: "Challenge 1: The Silent Request",
+      difficulty: 1,
+      points: 100,
+      targetName: "UserHub",
+      editorLanguage: "html",
+      sandboxType: "csrf",
+      editorLabel: "Attacker Page",
+      editorAction: "Launch Attack",
+      editorHint: "Write the HTML for your attacker page. When the victim visits it, the browser will fire any requests it finds — including ones that carry the victim's session cookie automatically.",
+      editorPlaceholder: "<img src=\"...\">",
+      summary: "Craft an attacker page that silently changes the victim's email via a GET request.",
+      description:
+        "UserHub is an account management portal. The 'change email' endpoint accepts a GET request with no CSRF token — whoever the session cookie says you are, that's whose email gets changed.\n\nThe victim is logged in to UserHub in the right pane. They're about to visit your page.\n\nWrite an attacker page in the left editor. When the victim's browser loads it, it should fire a GET request to /change-email that silently changes their email to one you control.",
+      goal: "Change the victim's email to attacker@evil.com using only HTML.",
+      hints: [
+        "Which HTML element makes the browser fetch a URL automatically, with no user interaction? It's usually used for images.",
+        "An <img> tag fires a GET request for its src the moment it loads — even if the URL isn't an image.",
+        "The target endpoint is /change-email and it accepts an email query parameter. Try: <img src=\"/change-email?email=attacker@evil.com\">",
+        "The browser attaches the victim's session cookie automatically — you don't need to do anything special for that.",
+      ],
+      solution: {
+        payload: "<img src=\"/change-email?email=attacker@evil.com\">",
+        explanation: [
+          "The <img> tag told the browser to fetch /change-email?email=attacker@evil.com the instant your attacker page loaded.",
+          "The browser attached the victim's session cookie automatically — it always does this for matching domains.",
+          "The server saw a valid authenticated GET request and changed the email. It had no way to tell the request came from a different page.",
+          "This is GET-based CSRF — any endpoint that changes state via GET is exploitable with a single HTML tag.",
+        ],
+      },
+      defense: {
+        summary: "Two fixes are needed: move state-changing actions to POST (so a bare <img> can't trigger them), and add a CSRF token so the server can verify the request originated from its own page.",
+        measures: [
+          {
+            title: "Never change state with a GET request",
+            body: "GET is defined as a 'safe' method — browsers, proxies, and prefetchers freely follow GET URLs. Any action that changes data must use POST, PUT, PATCH, or DELETE.",
+          },
+          {
+            title: "Require a CSRF token on all state-changing endpoints",
+            body: "Generate a secret per-session token, embed it in every form, and validate it server-side on submission. Because the attacker's page can't read the token from your site (blocked by Same-Origin Policy), it can't forge a valid request.",
+          },
+        ],
+      },
+      animation: [
+        {
+          type: "block",
+          label: "attacker page loaded by victim browser",
+          accent: "red",
+          delay: 0,
+          segments: [
+            { text: "<img ", cls: "text-red-400" },
+            { text: 'src="', cls: "text-gray-400" },
+            { text: "/change-email?email=attacker@evil.com", cls: "text-orange-300", delay: 0.3 },
+            { text: '">', cls: "text-gray-400" },
+            { text: "↑ browser fires GET automatically on load", cls: "block text-xs text-orange-500 mt-1", delay: 0.6 },
+          ],
+        },
+        {
+          type: "arrow",
+          label: "browser attaches session cookie",
+          delay: 0.8,
+        },
+        {
+          type: "block",
+          label: "request received by server",
+          accent: "orange",
+          delay: 1.0,
+          segments: [
+            { text: "GET ", cls: "text-gray-400" },
+            { text: "/change-email", cls: "text-cyan-300" },
+            { text: "?email=", cls: "text-gray-400" },
+            { text: "attacker@evil.com", cls: "text-red-400", delay: 1.2 },
+            { text: "\nCookie: ", cls: "text-gray-400 block mt-1" },
+            { text: "session_id=victim_token", cls: "text-yellow-300", delay: 1.4 },
+            { text: "\n✓ server sees valid session — email changed", cls: "block text-xs text-green-400 mt-1.5", delay: 1.7 },
+          ],
+        },
+        {
+          type: "legend",
+          delay: 2.0,
+          items: [
+            { code: "<img src>", codeCls: "text-red-400", desc: "fires a GET request automatically — no user interaction needed", delay: 2.0 },
+            { code: "session cookie", codeCls: "text-yellow-300", desc: "attached by the browser automatically — the attacker never touches it", delay: 2.2 },
+            { code: "no CSRF token", codeCls: "text-orange-400", desc: "server can't tell this request didn't come from its own page", delay: 2.4 },
+          ],
+        },
+      ],
+    },
+    {
+      id: "csrf-2-post",
+      title: "Challenge 2: The Hidden Form",
+      difficulty: 2,
+      points: 150,
+      targetName: "UserHub",
+      editorLanguage: "html",
+      sandboxType: "csrf",
+      editorLabel: "Attacker Page",
+      editorAction: "Launch Attack",
+      editorHint: "Write the HTML for your attacker page. The endpoint now requires POST — an <img> tag won't work. You need a form that submits itself the moment the page loads.",
+      editorPlaceholder: "<form method=\"POST\" action=\"...\">...</form>\n<script>document.forms[0].submit()</script>",
+      summary: "Auto-submit a hidden form to trigger a POST-based CSRF attack.",
+      description:
+        "UserHub updated the change-email endpoint to require POST. The <img> trick from Challenge 1 no longer works — browsers only fire GET requests from <img> tags.\n\nBut a <form> can send POST. And a <script> can submit that form the instant the page loads — before the victim sees anything.\n\nCraft an attacker page with a hidden auto-submitting form.",
+      goal: "Change the victim's email to attacker@evil.com using a POST request.",
+      hints: [
+        "An <img> tag fires a GET request. For POST, you need a <form> with method=\"POST\".",
+        "Set the form's action to /change-email and add a hidden input for the email field.",
+        "The form won't submit itself automatically — you need a <script> that calls document.forms[0].submit() right after the form.",
+        "Full payload: <form method=\"POST\" action=\"/change-email\"><input type=\"hidden\" name=\"email\" value=\"attacker@evil.com\"></form><script>document.forms[0].submit()</script>",
+      ],
+      solution: {
+        payload: "<form method=\"POST\" action=\"/change-email\"><input type=\"hidden\" name=\"email\" value=\"attacker@evil.com\"></form><script>document.forms[0].submit()</script>",
+        explanation: [
+          "The hidden form was invisible to the victim — no UI, no prompt, nothing to click.",
+          "document.forms[0].submit() fired the moment the attacker page loaded, sending a POST to /change-email.",
+          "The browser attached the session cookie to the POST request automatically — just as it does for GET.",
+          "The server received a valid authenticated POST and changed the email. Using POST instead of GET is necessary but not sufficient — without a CSRF token, the server still can't distinguish a forged request from a real one.",
+        ],
+      },
+      defense: {
+        summary: "POST prevents accidental CSRF via browser prefetching, but deliberate attacks still work. A CSRF token is the real fix.",
+        measures: [
+          {
+            title: "Require a CSRF token on all POST endpoints",
+            body: "The token must be: generated per-session, embedded in every form, and validated server-side. An attacker's page can't read the token from your site, so it can't include a valid one.",
+          },
+          {
+            title: "Set SameSite=Strict or SameSite=Lax on session cookies",
+            body: "SameSite=Strict tells the browser to never send the cookie on cross-site requests. SameSite=Lax blocks it on cross-site POST. Either stops this attack at the cookie level.",
+          },
+        ],
+      },
+      animation: [
+        {
+          type: "block",
+          label: "attacker page — hidden form + auto-submit",
+          accent: "red",
+          delay: 0,
+          segments: [
+            { text: '<form method="POST" action="/change-email">\n', cls: "text-red-400" },
+            { text: '  <input type="hidden" name="email"\n', cls: "text-gray-300", delay: 0.3 },
+            { text: '         value="attacker@evil.com">\n', cls: "text-orange-300", delay: 0.4 },
+            { text: "</form>", cls: "text-red-400", delay: 0.5 },
+            { text: "\n<script>", cls: "text-gray-400", delay: 0.6 },
+            { text: "document.forms[0].submit()", cls: "text-yellow-300", delay: 0.7 },
+            { text: "<\/script>", cls: "text-gray-400", delay: 0.8 },
+          ],
+        },
+        {
+          type: "arrow",
+          label: "POST fires on page load — session cookie attached",
+          delay: 1.0,
+        },
+        {
+          type: "block",
+          label: "server receives authenticated POST",
+          accent: "orange",
+          delay: 1.2,
+          segments: [
+            { text: "POST /change-email HTTP/1.1\n", cls: "text-cyan-300" },
+            { text: "Cookie: session_id=victim_token\n", cls: "text-yellow-300", delay: 1.4 },
+            { text: "\nemail=attacker@evil.com", cls: "text-red-400", delay: 1.6 },
+            { text: "\n✓ POST accepted — email changed", cls: "block text-xs text-green-400 mt-1.5", delay: 1.9 },
+          ],
+        },
+      ],
+    },
+    {
+      id: "csrf-3-token",
+      title: "Challenge 3: The Useless Token",
+      difficulty: 2,
+      points: 150,
+      targetName: "UserHub",
+      editorLanguage: "html",
+      sandboxType: "csrf",
+      editorLabel: "Attacker Page",
+      editorAction: "Launch Attack",
+      editorHint: "The form now has a csrf_token field. Inspect the victim page and check whether the server actually validates it — or just checks that the field exists.",
+      editorPlaceholder: "<form method=\"POST\" action=\"...\">...</form>\n<script>document.forms[0].submit()</script>",
+      summary: "Bypass a CSRF token that is present in the form but never validated server-side.",
+      description:
+        "UserHub added a CSRF token to the change-email form. You can see it in the victim pane.\n\nBut 'token present' doesn't mean 'token validated'. Check whether the server actually verifies the value — or whether any value (or no value) is silently accepted.\n\nYour form must include the csrf_token field. The value is up to you.",
+      goal: "Change the victim's email to attacker@evil.com despite the CSRF token field.",
+      hints: [
+        "Right-click the victim pane and view source. The form has a csrf_token hidden input — but does the server check its value?",
+        "Include the csrf_token field in your forged form with any value — try 'fake', 'x', or even an empty string.",
+        "If any value works, the server is checking that the field exists but not that it matches the session token. That's the vulnerability.",
+        "Full payload: <form method=\"POST\" action=\"/change-email\"><input type=\"hidden\" name=\"email\" value=\"attacker@evil.com\"><input type=\"hidden\" name=\"csrf_token\" value=\"fake\"></form><script>document.forms[0].submit()</script>",
+      ],
+      solution: {
+        payload: "<form method=\"POST\" action=\"/change-email\"><input type=\"hidden\" name=\"email\" value=\"attacker@evil.com\"><input type=\"hidden\" name=\"csrf_token\" value=\"fake\"></form><script>document.forms[0].submit()</script>",
+        explanation: [
+          "The csrf_token field was present in the form, but the server never checked whether it matched the session's real token.",
+          "Submitting any value — 'fake', 'x', an empty string — succeeded because the validation was missing.",
+          "A CSRF token only protects against forgery if the server validates that the submitted value matches the one it generated for this session.",
+          "This is one of the most common CSRF token failures: the infrastructure is in place, but the actual check was never implemented.",
+        ],
+      },
+      defense: {
+        summary: "Generate a secret per-session token, embed it in every form, and validate it on every submission — checking that it matches the session, not just that it exists.",
+        measures: [
+          {
+            title: "Always compare the submitted token against the session token",
+            body: "Use a constant-time comparison (secrets.compare_digest in Python, crypto.timingSafeEqual in Node) to prevent timing attacks. Reject the request if the token is missing, blank, or mismatched.",
+          },
+          {
+            title: "Never accept a blank or predictable token",
+            body: "A token of '' or '0' or 'token' is worse than no token — it creates false confidence. Generate tokens with a cryptographically secure source (secrets.token_hex, os.urandom) and ensure empty submissions are rejected outright.",
+          },
+        ],
+      },
+      animation: [
+        {
+          type: "block",
+          label: "forged form with fake token",
+          accent: "red",
+          delay: 0,
+          segments: [
+            { text: '<input name="email" value="attacker@evil.com">\n', cls: "text-orange-300" },
+            { text: '<input name="csrf_token" value="', cls: "text-gray-400", delay: 0.3 },
+            { text: "fake", cls: "text-red-400 font-bold", delay: 0.4 },
+            { text: '">', cls: "text-gray-400", delay: 0.4 },
+            { text: "\n↑ attacker sets token to any value", cls: "block text-xs text-red-500 mt-1", delay: 0.7 },
+          ],
+        },
+        {
+          type: "arrow",
+          label: "POST sent with fake token + session cookie",
+          delay: 0.9,
+        },
+        {
+          type: "block",
+          label: "server validation — broken",
+          accent: "orange",
+          delay: 1.1,
+          segments: [
+            { text: "# actual server code\n", cls: "text-gray-500" },
+            { text: "token = request.form.get('csrf_token')\n", cls: "text-gray-300", delay: 1.2 },
+            { text: "if token:\n", cls: "text-yellow-300", delay: 1.3 },
+            { text: "    proceed()  ", cls: "text-gray-300", delay: 1.4 },
+            { text: "# ← never checks session token!", cls: "text-red-400", delay: 1.5 },
+            { text: "\n✓ 'fake' is truthy — email changed", cls: "block text-xs text-green-400 mt-1.5", delay: 1.8 },
+          ],
+        },
+        {
+          type: "legend",
+          delay: 2.0,
+          items: [
+            { code: "token present", codeCls: "text-yellow-400", desc: "server checks the field exists — not that the value is correct", delay: 2.0 },
+            { code: "no comparison", codeCls: "text-red-400", desc: "session token is never fetched or compared — the check is purely structural", delay: 2.2 },
+          ],
+        },
+      ],
+    },
+  ],
 };

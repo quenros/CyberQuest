@@ -8,16 +8,20 @@ import CodeSection from "../components/learn/CodeSection";
 import CardsSection from "../components/learn/CardsSection";
 import TypesSection from "../components/learn/TypesSection";
 import InjectionSection from "../components/learn/InjectionSection";
+import ModuleIntro from "../components/learn/ModuleIntro";
+import CsrfFlowSection from "../components/learn/CsrfFlowSection";
 
 function renderSection(section, i) {
   switch (section.type) {
-    case "intro":     return <IntroSection     key={i} {...section} />;
-    case "flow":      return <FlowSection      key={i} {...section} />;
-    case "code":      return <CodeSection      key={i} {...section} />;
-    case "injection": return <InjectionSection key={i} {...section} />;
-    case "cards":     return <CardsSection     key={i} {...section} />;
-    case "types":     return <TypesSection     key={i} {...section} />;
-    default:          return null;
+    case "intro":        return <IntroSection     key={i} {...section} />;
+    case "flow":         return <FlowSection      key={i} {...section} />;
+    case "code":         return <CodeSection      key={i} {...section} />;
+    case "injection":    return <InjectionSection key={i} {...section} />;
+    case "cards":        return <CardsSection     key={i} {...section} />;
+    case "types":        return <TypesSection     key={i} {...section} />;
+    case "module-intro": return <ModuleIntro      key={i} sections={section.sections} />;
+    case "csrf-flow":    return <CsrfFlowSection  key={i} />;
+    default:             return null;
   }
 }
 
