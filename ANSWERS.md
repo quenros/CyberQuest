@@ -215,3 +215,86 @@ DELETE FROM employees WHERE 1=1
 '; DELETE FROM employees WHERE dept='Engineering' --   ← deletes only Engineering dept
 '; DELETE FROM employees WHERE 1=1; --                 ← trailing semicolon also valid
 ```
+
+---
+
+## Cross-Site Request Forgery (CSRF)
+
+> **Note:** All CSRF challenges use the **two-pane sandbox** — the left pane is the attacker page you craft, the right pane is the victim's logged-in session. Write your HTML in the editor and click **Launch Attack**. The victim pane updates in real time when the forged request lands.
+
+---
+
+### Challenge 1: The Silent Request *(UserHub · Difficulty 1 · 100 pts)*
+
+**Goal:** Change the victim's email to attacker@evil.com using only HTML.
+
+**Steps:**
+1. Look at the victim pane on the right — the logged-in user's email is `victim@corp.com`.
+2. The endpoint `/change-email` accepts a GET request with an `email` query parameter and no CSRF token.
+3. An `<img>` tag fires a GET request for its `src` automatically when the page loads — even if the URL isn't an image.
+4. Enter the payload below in the editor and click **Launch Attack**.
+5. Watch the victim pane — the email changes to `attacker@evil.com` and the success modal appears.
+
+**Payload:**
+```html
+<img src="/change-email?email=attacker@evil.com">
+```
+
+**How it works:**
+- The `<img>` tag tells the browser to fetch `/change-email?email=attacker@evil.com` the instant the attacker page loads.
+- The browser attaches the victim's session cookie automatically — it does this for every matching request, no matter where the request originates.
+- The server sees a valid authenticated GET request and changes the email. It has no way to tell the request came from a different page.
+- This is **GET-based CSRF** — any endpoint that changes state via GET is exploitable with a single HTML tag.
+
+---
+
+### Challenge 2: The Hidden Form *(UserHub · Difficulty 2 · 150 pts)*
+
+**Goal:** Change the victim's email to attacker@evil.com using a POST request.
+
+**Steps:**
+1. The endpoint now requires POST — the `<img>` trick from Challenge 1 no longer works (browsers only fire GET requests from `<img>`).
+2. A `<form>` can send POST. Hidden inputs hold the data, and a `<script>` can submit the form automatically before the victim sees anything.
+3. Enter the payload below in the editor and click **Launch Attack**.
+4. Watch the victim pane — the email changes and the success modal appears.
+
+**Payload:**
+```html
+<form method="POST" action="/change-email">
+  <input type="hidden" name="email" value="attacker@evil.com">
+</form>
+<script>document.forms[0].submit()</script>
+```
+
+**How it works:**
+- The hidden form is invisible to the victim — no UI, no prompt, nothing to click.
+- `document.forms[0].submit()` fires the moment the attacker page loads, sending a POST to `/change-email`.
+- The browser attaches the session cookie to POST requests automatically — just as it does for GET.
+- The server receives a valid authenticated POST and changes the email. Using POST instead of GET is necessary but not sufficient — without a CSRF token, the server still can't distinguish a forged request from a real one.
+
+---
+
+### Challenge 3: The Useless Token *(UserHub · Difficulty 2 · 150 pts)*
+
+**Goal:** Change the victim's email to attacker@evil.com despite the CSRF token field.
+
+**Steps:**
+1. Look at the victim pane — notice the CSRF token field is shown. The form has a `csrf_token` field.
+2. The server checks that the field *exists*, but never validates whether the value matches the session token.
+3. Include the `csrf_token` field in your forged form with any value — `fake`, `x`, or even an empty string.
+4. Enter the payload below in the editor and click **Launch Attack**.
+
+**Payload:**
+```html
+<form method="POST" action="/change-email">
+  <input type="hidden" name="email" value="attacker@evil.com">
+  <input type="hidden" name="csrf_token" value="fake">
+</form>
+<script>document.forms[0].submit()</script>
+```
+
+**How it works:**
+- The `csrf_token` field is present in the form, but the server never checks whether it matches the session's real token.
+- Submitting any value — `fake`, `x`, an empty string — succeeds because the validation is missing.
+- A CSRF token only protects against forgery if the server validates that the submitted value matches the one it generated for this session.
+- This is one of the most common CSRF token failures: the infrastructure is in place, but the actual check was never implemented.

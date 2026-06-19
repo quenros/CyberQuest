@@ -29,13 +29,76 @@ A full-stack web application designed to make cybersecurity education accessible
 React, Tailwind CSS, Framer Motion, Flask, MongoDB, Docker, Claude API (AI hints)
 
 #### Current Status
-- [ ] MVP in development
-- [ ] Beta users (target: 20 students)
-- [ ] Complete learning modules (target: 3)
+- [x] 3 complete attack modules: XSS (5 challenges), SQL Injection (3 challenges), CSRF (3 challenges)
+- [x] Automated test suite: 24 unit/component tests (Vitest + RTL) + 1 Playwright e2e test
+- [x] Domain model, 4 ADRs, and project issue tracker established
+- [ ] Beta users (target: 20 students from DART classes)
+- [ ] Teacher dashboard
+- [ ] Production deployment
 
 ---
 
 ## Development Changelog
+
+### Checkpoint — 2026-06-19
+
+#### CSRF Module + Automated Testing Foundation
+
+**Testing Infrastructure**
+- Vitest + React Testing Library + jsdom configured for the frontend (`vitest.config.js`, `src/test/setup.js`)
+- `npm test` runs 24 unit/component tests across 5 test files in ~1.7s
+- Playwright e2e test (`e2e/csrf-challenge-1.spec.js`) drives a real Chromium browser through the full Challenge 1 flow
+- `IntersectionObserver` stub added to jsdom setup (required by Framer Motion `whileInView`)
+
+**CSRF Infrastructure — `csrfSandbox.js`**
+- New `frontend/src/utils/csrfSandbox.js` utility — mirrors `sqlSandbox.js` pattern
+- `processRequest(state, request)` — pure function (no DOM), handles all 3 challenge variants; 12 unit tests cover all paths
+- `buildAttackerSrcdoc(payloadHtml)` — wraps student HTML in a page pre-injected with a request-interception shim
+- `buildVictimSrcdoc(challengeId)` — builds the logged-in victim app for each challenge (GET, POST, token variants)
+- Attacker shim intercepts `fetch`, `XMLHttpRequest`, `<img>`, and `<form>` via MutationObserver; routes requests via `parent.postMessage` rather than firing real HTTP (avoids the `about:srcdoc` origin issue by normalising paths against `http://localhost`)
+- Victim app listens for `csrf-request` postMessages, calls `processRequest`, updates its UI, and fires `csrf-triggered` to the parent on win
+
+**Challenge 1 — GET-based CSRF (`csrf-1-get`, UserHub)**
+- Endpoint `/change-email` accepts GET with no CSRF token
+- Student writes `<img src="/change-email?email=attacker@evil.com">` — fires automatically on page load
+- Win: victim email changes in right pane → success modal
+
+**Challenge 2 — POST-based CSRF (`csrf-2-post`, UserHub)**
+- Endpoint now requires POST — `<img>` no longer works
+- Student writes a hidden auto-submitting form: `<form method="POST">` + `document.forms[0].submit()`
+- Bridge lecture "POST Requests & Auto-Submitting Forms" unlocks between C1 and C2
+
+**Challenge 3 — CSRF Token Bypass (`csrf-3-token`, UserHub)**
+- Token field visible in victim pane — server accepts any value (including blank)
+- Student submits form with `csrf_token: "fake"` — passes silently
+- Bridge lecture "CSRF Tokens & How They Fail" unlocks between C2 and C3
+
+**CSRF Learn Page**
+- `ModuleIntro` component (new, reusable) — renders HTTP/cookie prerequisite primer before the attack concept; props-driven so future modules reuse it
+- `CsrfFlowSection` component (new) — `useAnimate` Framer Motion sequence: request arrow draws, cookie badge slides along it, server box flashes red; replay button re-triggers the animation
+- Learn page wired in `learnContent.js` (`csrf` key) with sections: `module-intro`, `csrf-flow`, intro, danger cards, code example, types (GET/POST/token), CTA
+- Both new section types registered in `LearnPage.jsx` `renderSection` switch
+
+**Two-pane sandbox layout (`ChallengePage.jsx`)**
+- New `sandboxType: "csrf"` branch renders two iframes side-by-side: ATTACKER PAGE (left, student's HTML) + VICTIM SESSION (right, logged-in app)
+- postMessage bridge: parent routes `csrf-request` from attacker iframe → victim iframe; listens for `csrf-triggered` → success modal
+- Existing `srcdoc`, `sql`, and `container` paths are unchanged
+
+**Architecture decisions recorded**
+- `docs/adr/0001` — srcdoc vs container sandbox strategy (retroactive)
+- `docs/adr/0002` — CSRF two-pane sandbox layout
+- `docs/adr/0003` — postMessage bridge (no real HTTP for Tier A CSRF)
+- `docs/adr/0004` — ModuleIntro as reusable component for prerequisite content
+
+**Domain model**
+- `CONTEXT.md` established at repo root with glossary: Module, Challenge, Bridge Lecture, Module Intro, Sandbox, Tier A, Tier B
+
+**Agent workflow**
+- `.claude/skills/` — 34 Matt Pocock skills installed (real directories, not symlinks)
+- `.scratch/` — local markdown issue tracker; all CSRF module issues filed and completed
+- `docs/agents/` — issue tracker, triage labels, and domain doc consumer rules
+
+---
 
 ### Checkpoint — 2026-05-06
 
@@ -342,18 +405,19 @@ Added four new data fields to every challenge in `challenges.js`:
 ## Feature Prioritization
 
 ### Must Have (Week 1-6)
-- ✅ User auth (student/teacher)
-- ✅ 2 complete challenge modules
-- ✅ Docker sandbox for each challenge
-- ✅ AI-powered hints
-- ✅ Progress tracking
-- ✅ Basic teacher dashboard
+- ✅ User auth (student/teacher) — name-only entry live; full JWT auth scaffolded
+- ✅ 3 complete challenge modules — XSS (5), SQL Injection (3), CSRF (3)
+- ✅ Sandboxed environments — srcdoc (stateless), Docker container (stored XSS), postMessage bridge (CSRF)
+- ✅ AI-powered hints — Claude API hint endpoint wired in backend
+- ✅ Automated test suite — 24 unit/component tests + Playwright e2e
+- 🔲 Progress tracking — backend schema exists; frontend not yet wired
+- 🔲 Teacher dashboard — deferred
 
 ### Should Have (Week 7-8)
-- ✅ Third module
-- ✅ Gamification (points, levels)
-- ✅ Mobile responsive
-- ✅ Challenge analytics
+- ✅ Third module — CSRF complete
+- 🔲 Gamification (points, levels) — point values defined per challenge; XP system not yet built
+- 🔲 Mobile responsive — not yet addressed
+- 🔲 Challenge analytics — deferred with teacher dashboard
 
 ### Nice to Have (Post-MVP)
 - 🔲 Student vs student competitions
@@ -370,31 +434,44 @@ Added four new data fields to every challenge in `challenges.js`:
 
 ### Module Priority Order
 
-#### Tier 1 (MVP - Week 3-6)
-1. **XSS (Cross-Site Scripting)** ✅ In progress — 5 challenges built
+#### Tier 1 — Complete
+1. **XSS (Cross-Site Scripting)** ✅ — 5 challenges built
    - ✅ Challenge 1: Reflected XSS — comment board (`<script>` tag injection)
    - ✅ Challenge 2: JS string context — analytics script (`"; alert('xss')//`)
    - ✅ Challenge 3: javascript: URI — ReturnPortal login redirect
    - ✅ Challenge 4: Attribute injection — ProfileHub username field (`onclick`)
    - ✅ Challenge 5: Stored XSS — NoteNest cookie exfiltration (Docker container)
    - ✅ Learn page with intro, attack flow, code example, injection visualiser, danger cards, XSS types
-2. **SQL Injection** ✅ In progress — 3 challenges built, learn page + 2 bridge lectures complete
-   - ✅ Learn page: intro, attack flow, payload code, danger cards (bypass/exfiltration/destruction/escalation), types (Classic/Blind/Time-based), recon step-0, CTA
-   - ✅ Bridge lecture: "UNION Injection & Schema Discovery" (schema recon, column counting, UNION rules, visualisers)
-   - ✅ Bridge lecture: "Stacked Queries" (semicolon chaining, WHERE 1=1, attack flow)
+   - 🔲 Challenge 6: Filter bypass (`<img onerror>`, `<svg onload>`) — filed in `.scratch/xss-filter-bypass`
+
+2. **SQL Injection** ✅ — 3 challenges built, learn page + 2 bridge lectures complete
+   - ✅ Learn page: intro, attack flow, payload code, danger cards, types (Classic/Blind/Time-based), recon step-0, CTA
+   - ✅ Bridge lecture: "UNION Injection & Schema Discovery"
+   - ✅ Bridge lecture: "Stacked Queries"
    - ✅ Challenge 1: Login bypass — AdminPortal (`admin' --`)
    - ✅ Challenge 2: UNION exfiltration — ShopDB (dump hidden users table)
    - ✅ Challenge 3: Stacked query destruction — StaffDB (DELETE all rows)
-   - ✅ In-browser SQL sandbox (`sqlSandbox.js`): 3 page types (login, search, stacked), AlaSQL engine, live query visualiser, SQL Terminal recon panel
-   - [ ] Challenge 4+: Blind SQLi — deferred
+   - ✅ In-browser SQL sandbox (`sqlSandbox.js`): AlaSQL engine, live query visualiser, SQL Terminal recon panel
+   - 🔲 Challenge 4+: Blind SQLi — deferred
 
-#### Tier 2 (Week 7-8)
-3. **Input Validation** — Foundation concept, ties to both XSS and SQL
+3. **CSRF (Cross-Site Request Forgery)** ✅ — 3 challenges built, learn page + 2 bridge lectures complete
+   - ✅ ModuleIntro component (HTTP/cookie primer — reusable for future modules)
+   - ✅ CsrfFlowSection component (animated two-actor attack sequence with replay button)
+   - ✅ Learn page: module-intro, csrf-flow animation, intro, danger cards, code example, types (GET/POST/token), CTA
+   - ✅ Bridge lecture: "POST Requests & Auto-Submitting Forms"
+   - ✅ Bridge lecture: "CSRF Tokens & How They Fail"
+   - ✅ Challenge 1: GET-based — UserHub (`<img src="/change-email?email=attacker@evil.com">`)
+   - ✅ Challenge 2: POST-based — UserHub (hidden auto-submitting form)
+   - ✅ Challenge 3: Token bypass — UserHub (server accepts any token value)
+   - ✅ Two-pane sandbox (attacker page + victim session), postMessage bridge, `csrfSandbox.js`
+
+#### Tier 2 — Next
+4. **Input Validation / Command Injection** — ties XSS/SQLi concepts to a new attack surface
+5. **Session Management** — cookie flags, fixation, hijacking (builds on CSRF prerequisites already taught)
 
 #### Tier 3 (Post-MVP)
-4. **CSRF** — More complex, requires understanding sessions
-5. **Session Management** — Cookie security, hijacking
 6. **Authentication Bypass** — Combines multiple concepts
+7. **IDOR** — Insecure direct object reference, common in Tier A CTFs
 
 #### Tier 4 (Future)
 7. **Burp Suite Module** — Professional tooling (see note below)
@@ -506,11 +583,14 @@ Added four new data fields to every challenge in `challenges.js`:
 
 ### Week 6
 - [ ] 20 students active
-- [ ] Both modules stable
+- [x] 3 modules built and stable
 - [ ] Analytics working
 
 ### Week 7
-- [ ] Third module complete
+- [x] CSRF module complete: 3 challenges (GET, POST, token bypass) + 2 bridge lectures + ModuleIntro + CsrfFlowSection
+- [x] Automated testing foundation: 24 unit/component tests + Playwright e2e
+- [x] Domain model (CONTEXT.md) + 4 ADRs documented
+- [ ] XSS filter bypass challenge (backlog — .scratch/xss-filter-bypass)
 - [ ] Mobile responsive
 - [ ] Demo video recorded
 
